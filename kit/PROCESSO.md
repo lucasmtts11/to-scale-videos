@@ -1,6 +1,8 @@
 # Processo de produção — @to.scale8 (formato "E se...?" em low-poly: comida exagerada, absurdo geral e engenharia de vez em quando)
 
-Referência pronta: `exemplo-ep03/` (vídeo publicado: videos/ep03-tirar-um-pilar-v2.mp4).
+Referências prontas: `exemplo-ep03/` (engenharia, casa) e `exemplo-ep04/` (comida: mesa, pilha de
+picanha instanciada, barriga que incha, raio-x do estômago, convidados, etapas 1 hora/1 dia/1 semana).
+Referência original: `exemplo-ep03/` (vídeo publicado: videos/ep03-tirar-um-pilar-v2.mp4).
 Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infraestrutura
 (câmeras, HUD, legendas sincronizadas, etiquetas, poeira, colapso, boneco de capacete).
 
@@ -31,6 +33,11 @@ Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infr
 - Perguntas sempre terminando em "?" e separadas da frase seguinte.
 - Frases de 1-2 palavras ("Dá.", "Tira ele.") costumam sair erradas: conferir o log e, se precisar,
   regenerar só aquele trecho: `python3 tts.py <id_do_trecho>`.
+- Frases curtas de aviso também falham ("Não tente isso." saiu "Não tem cheese"): escrever o aviso
+  falado numa frase mais longa ("Sério, por favor, não tente fazer isso.") e conferir a similaridade no log.
+- MEMÓRIA (lição do ep04): a máquina tem ~8 GB e o tts.py vaza memória; rodar todos os trechos num só
+  processo foi morto por OOM no meio. Rodar UM trecho por processo, em sequência e desacoplado do shell:
+  `for s in hook escala ...; do python3 tts.py $s >> tts.log 2>&1; done` (script com setsid nohup).
 - Duração mínima do vídeo: 60 s. Se ficar curto, aumentar EXTRA (pausas dramáticas) no build_timeline.py.
 
 ## Passo a passo (em /home/claude/ep, com EP=/home/claude/ep)
@@ -46,9 +53,11 @@ Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infr
 7. `python3 mix.py` (trilha original + efeitos + voz) — ajustar os efeitos aos eventos do roteiro novo.
 8. Render em 4 partes paralelas: `HTML=cena.html node render.mjs video seg/s0.mp4 0 T1 &` ... ; juntar com
    concat `-c copy`, somar `audio_final.wav` com `-map 0:v -map 1:a -c:v copy -c:a aac`.
-9. Conferir contact sheet (1 quadro a cada ~2,5 s) e a duração.
-10. Subir para `videos/epNN-slug.mp4` no repositório, adicionar o tema em `usados.md`.
-11. Buffer (organização "My organization", canal TikTok @to.scale8): criar o post como RASCUNHO
+9. Prévias: montar uma grade (PIL) com 12-18 quadros e olhar tudo de uma vez; checar se pílulas/rótulos
+   não cobrem a cabeça do boneco e se `wordTime` não pega a palavra errada (ex.: "três" aparece duas vezes).
+10. Conferir contact sheet (1 quadro a cada ~2,5 s) e a duração.
+11. Subir para `videos/epNN-slug.mp4` no repositório, adicionar o tema em `usados.md`.
+12. Buffer (organização "My organization", canal TikTok @to.scale8): criar o post como RASCUNHO
     (saveToDraft: true), legenda com pergunta + 4 a 6 hashtags do tema (#curiosidades #ese #exagero + específicas),
     metadata.tiktok.isAiGenerated = true, thumbnailOffset num quadro forte.
     NÃO publicar: o Lucas aprova cada post no app do Buffer (Add to Queue / horário 19:00).

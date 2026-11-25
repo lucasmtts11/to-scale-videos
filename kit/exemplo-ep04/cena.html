@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000}canvas{display:block}#gl{position:absolute;left:-9999px}</style>
+</head><body>
+<canvas id="out" width="1080" height="1920"></canvas>
+<script src="timeline.js"></script>
+<script type="module">
+import * as THREE from "./node_modules/three/build/three.module.js";
+const W = 1080, H = 1920;
+const TL = window.TL;
+const DURATION = TL.total;
+const SEG = Object.fromEntries(TL.segs.map(s => [s.id, s]));
+
+// ================= utilitários =================
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = x => 1 - Math.pow(1 - clamp(x), 3);
+const easeInOut = x => { x = clamp(x); return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2; };
+function spring(t, f = 1.6, z = 0.6) { if (t <= 0) return 0; const w = 2*Math.PI*f, wd = w*Math.sqrt(1-z*z); return 1 - Math.exp(-z*w*t)*(Math.cos(wd*t) + (z*w/wd)*Math.sin(wd*t)); }
+const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+function wordTime(seg, w, nth = 0) {
+  const list = TL.words.filter(x => x.seg === seg && x.w.toLowerCase().replace(/[^a-zà-ú0-9]/g, "").startsWith(w));
+  return list.length ? list[Math.min(nth, list.length - 1)].s : null;
+}
+
+// ================= renderer / cena =================
+const glCanvas = document.createElement("canvas"); glCanvas.id = "gl"; document.body.appendChild(glCanvas);
+const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+{
+  const c = document.createElement("canvas"); c.width = 4; c.height = 256; const g = c.getContext("2d");
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, "#5FA8E6"); gr.addColorStop(0.55, "#BFE0F5"); gr.addColorStop(1, "#FBE8C8");
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; scene.background = tex;
+}
+scene.fog = new THREE.Fog(0xEFE6D8, 30, 90);
+const camera = new THREE.PerspectiveCamera(50, W / H, 0.05, 300);
+scene.add(new THREE.HemisphereLight(0xFFF6EA, 0x7E9A62, 1.35));
+const sun = new THREE.DirectionalLight(0xFFE9C8, 2.4);
+sun.position.set(8, 14, 10); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 40 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+scene.add(sun);
+const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...extra });
+const box = (w, h, d, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.castShadow = m.receiveShadow = true; return m; };
+const cyl = (rt, rb, h, seg, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat); m.castShadow = m.receiveShadow = true; return m; };
+
+// quintal
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), M(0x8DBF5A)); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const deck = box(9, 0.06, 6, M(0xC9A27A)); deck.position.set(0.5, 0.03, -0.5); scene.add(deck);
+{
+  const trunkG = new THREE.CylinderGeometry(0.15, 0.2, 1.2, 6), topG = new THREE.ConeGeometry(1.0, 2.4, 7), N = 40;
+  const trunks = new THREE.InstancedMesh(trunkG, M(0x6B4F36), N), tops = new THREE.InstancedMesh(topG, M(0x4E8A3A), N), m = new THREE.Matrix4();
+  for (let i = 0; i < N; i++) {
+    const a = Math.PI * (0.9 + hash(i) * 1.2), r = 12 + hash(i + 50) * 18, s = 0.8 + hash(i + 9) * 0.8;
+    const x = Math.cos(a) * r * 1.3, z = Math.sin(a) * r - 4;
+    m.compose(new THREE.Vector3(x, 0.6 * s, z), new THREE.Quaternion(), new THREE.Vector3(s, s, s)); trunks.setMatrixAt(i, m);
+    m.compose(new THREE.Vector3(x, 2.2 * s, z), new THREE.Quaternion(), new THREE.Vector3(s, s, s)); tops.setMatrixAt(i, m);
+  }
+  trunks.castShadow = tops.castShadow = true; scene.add(trunks, tops);
+  const wood = M(0xE9DFCF);
+  for (let x = -8; x <= 9; x += 0.5) { const p = box(0.1, 1.4, 0.06, wood); p.position.set(x, 0.7, -4.2); scene.add(p); }
+  const rail = box(17.2, 0.1, 0.05, wood); rail.position.set(0.5, 1.1, -4.15); scene.add(rail);
+}
+// churrasqueira de tijolo
+const grill = new THREE.Group(); grill.position.set(3.4, 0, -2.6); scene.add(grill);
+{
+  const brick = M(0xB4583A), dark = M(0x2A2A2A);
+  const base = box(2.0, 0.95, 1.0, brick); base.position.y = 0.475; grill.add(base);
+  for (const sx of [-1, 1]) { const s = box(0.2, 1.1, 1.0, brick); s.position.set(sx * 0.9, 1.5, 0); grill.add(s); }
+  const back = box(2.0, 1.1, 0.2, brick); back.position.set(0, 1.5, -0.4); grill.add(back);
+  const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 1.05, 0.7, 4), brick); hood.rotation.y = Math.PI / 4; hood.position.y = 2.4; hood.castShadow = true; grill.add(hood);
+  const chim = box(0.4, 1.4, 0.4, brick); chim.position.y = 3.3; grill.add(chim);
+  const coal = box(1.6, 0.1, 0.7, M(0xFF6A1A, { emissive: 0xFF3A00, emissiveIntensity: 0.8 })); coal.position.y = 1.0; grill.add(coal);
+  for (let i = 0; i < 5; i++) { const sk = box(1.9, 0.03, 0.03, M(0xC8C8C8, { metalness: 0.6 })); sk.position.set(0, 1.35, -0.25 + i * 0.12); grill.add(sk); }
+}
+const SMOKE = 40;
+const smoke = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.22, 0), M(0xEDEDED, { transparent: true, opacity: 0.55 }), SMOKE); scene.add(smoke);
+function drawSmoke(t) {
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  for (let i = 0; i < SMOKE; i++) {
+    const u = (t * 0.25 + hash(i)) % 1, s = 0.4 + u * 1.6;
+    m.compose(new THREE.Vector3(3.4 + Math.sin(u * 6 + i) * 0.3 * u + u * 1.2, 4.0 + u * 5, -2.6 + Math.cos(i) * 0.2), q, new THREE.Vector3(s, s, s)); smoke.setMatrixAt(i, m);
+  }
+  smoke.instanceMatrix.needsUpdate = true;
+}
+
+// ================= mesa (quebra com o peso) =================
+const table = new THREE.Group(); table.position.set(0.6, 0, 0.2); scene.add(table);
+const tableTop = box(2.6, 0.1, 1.3, M(0x9C6B3E)); tableTop.position.y = 0.92; table.add(tableTop);
+const cloth = box(2.64, 0.02, 1.34, M(0xD8473A)); cloth.position.y = 0.98; table.add(cloth);
+const legs = [];
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const piv = new THREE.Group(); piv.position.set(sx * 1.15, 0.87, sz * 0.52); const l = box(0.1, 0.87, 0.1, M(0x7A5230)); l.position.y = -0.435; piv.add(l); table.add(piv); legs.push({ piv, sx, sz }); }
+const board = box(1.0, 0.05, 0.6, M(0xC99A66)); board.position.set(-0.6, 1.02, 0.25); table.add(board);
+const plate = cyl(0.22, 0.2, 0.03, 16, M(0xF4F4F4)); plate.position.set(1.0, 1.01, 0.35); table.add(plate);
+const portion = new THREE.Group(); plate.add(portion);
+function setTableBreak(k) {
+  // k 0..1: tampo afunda e entorta, pernas abrem
+  tableTop.position.y = 0.92 - 0.28 * k; cloth.position.y = tableTop.position.y + 0.06;
+  table.rotation.z = -0.12 * k; table.position.y = -0.02 * k;
+  legs.forEach(({ piv, sx, sz }) => { piv.rotation.z = sx * 0.55 * k; piv.rotation.x = -sz * 0.25 * k; piv.position.y = 0.87 - 0.28 * k; });
+  pileGroup.position.y = -0.28 * k;
+}
+
+// ================= picanha (peça low-poly com capa de gordura) =================
+function picanhaGeo() {
+  const parts = [[new THREE.BoxGeometry(0.34, 0.1, 0.2), [0.40, 0.11, 0.07], 0], [new THREE.BoxGeometry(0.34, 0.045, 0.2), [0.92, 0.76, 0.50], 0.072], [new THREE.BoxGeometry(0.30, 0.012, 0.03), [0.25, 0.08, 0.05], 0.052]];
+  const pos = [], nor = [], col = [];
+  for (const [g0, c, y] of parts) {
+    const g = g0.toNonIndexed(); g.translate(0, y, 0);
+    if (g0 === parts[2][0]) g.translate(0, 0, 0.0);
+    pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+    for (let i = 0; i < g.attributes.position.count; i++) col.push(...c);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+const PG = picanhaGeo(), PMAT = M(0xFFFFFF, { vertexColors: true });
+const pileGroup = new THREE.Group(); table.add(pileGroup);
+const NP = 84;
+const pile = new THREE.InstancedMesh(PG, PMAT, NP); pile.castShadow = true; pile.receiveShadow = true; pileGroup.add(pile);
+const pieces = [];
+{
+  let i = 0;
+  for (let L = 0; L < 9 && i < NP; L++) {
+    const r = 1.0 * (1 - L / 9.5), n = Math.max(3, Math.round(22 * (1 - L / 9)));
+    for (let k = 0; k < n && i < NP; k++, i++) {
+      const a = (k / n) * Math.PI * 2 + L * 0.7 + hash(i) * 0.4, rr = r * (0.25 + 0.75 * Math.sqrt(hash(i + 13)));
+      pieces.push({ x: Math.cos(a) * rr * 1.15, z: Math.sin(a) * rr * 0.5, y: 1.05 + L * 0.12 + hash(i + 3) * 0.03, ry: hash(i + 7) * 6.3, rx: (hash(i + 9) - 0.5) * 0.5, rz: (hash(i + 11) - 0.5) * 0.4, L });
+    }
+  }
+  pieces.sort((a, b) => b.y - a.y); // come de cima para baixo
+}
+const PILE_TOP = 1.05 + 8 * 0.12;
+function drawPile(visible, flyK = 0, mouth = null, t = 0) {
+  // visible: quantas peças ainda na mesa (de baixo para cima); as do topo somem primeiro
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  const off = NP - Math.round(visible);
+  for (let i = 0; i < NP; i++) {
+    const p = pieces[i];
+    if (i < off) { m.makeScale(0, 0, 0); pile.setMatrixAt(i, m); continue; }
+    e.set(p.rx, p.ry, p.rz); q.setFromEuler(e);
+    m.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(1, 1, 1)); pile.setMatrixAt(i, m);
+  }
+  pile.instanceMatrix.needsUpdate = true;
+}
+// peças voando até a boca
+const NF = 8;
+const flyers = new THREE.InstancedMesh(PG, PMAT, NF); flyers.castShadow = true; scene.add(flyers);
+function drawFlyers(t, t0, t1, mouthW) {
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  for (let i = 0; i < NF; i++) {
+    const u = ((t - t0) * 2.2 + i / NF) % 1;
+    if (t < t0 || t > t1) { m.makeScale(0, 0, 0); flyers.setMatrixAt(i, m); continue; }
+    const a = [table.position.x + (hash(i) - 0.5) * 1.2, 1.4, table.position.z + (hash(i + 4) - 0.5) * 0.5];
+    const x = lerp(a[0], mouthW.x, u), z = lerp(a[2], mouthW.z, u), y = lerp(a[1], mouthW.y, u) + Math.sin(u * Math.PI) * 0.8;
+    const s = 1 - 0.7 * u;
+    q.setFromEuler(new THREE.Euler(u * 8 + i, u * 5, i)); m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s, s)); flyers.setMatrixAt(i, m);
+  }
+  flyers.instanceMatrix.needsUpdate = true;
+}
+// porção de 400 g no prato
+{ for (let i = 0; i < 2; i++) { const p = new THREE.Mesh(PG, PMAT); p.scale.setScalar(0.85); p.position.set(0, 0.06 + i * 0.1, 0); p.rotation.y = i * 0.8; p.castShadow = true; portion.add(p); } }
+
+// ================= 37 convidados =================
+const NG = 37;
+const gBody = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.24, 1.1, 7), M(0xFFFFFF), NG);
+const gHead = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.15, 1), M(0xE3B08C), NG);
+gBody.castShadow = gHead.castShadow = true; scene.add(gBody, gHead);
+{ const c = new THREE.Color(); const cols = [0x3D7CC9, 0xE0383E, 0x1E9E52, 0xF2A33A, 0x8A5CC2, 0x2AA7A7, 0xF4F1EA]; for (let i = 0; i < NG; i++) gBody.setColorAt(i, c.setHex(cols[i % cols.length])); gBody.instanceColor.needsUpdate = true;
+  const sk = [0xE3B08C, 0xC98E66, 0x8D5B3E, 0xF0C9A8]; for (let i = 0; i < NG; i++) gHead.setColorAt(i, c.setHex(sk[i % 4])); gHead.instanceColor.needsUpdate = true; }
+const guests = [];
+for (let i = 0; i < NG; i++) { const row = i < 13 ? 0 : i < 25 ? 1 : 2, idx = row === 0 ? i : row === 1 ? i - 13 : i - 25, n = row === 0 ? 13 : 12; guests.push([-4.2 + idx * (8.4 / (n - 1)) + (row === 1 ? 0.3 : 0), -1.6 - row * 0.9]); }
+function drawGuests(t, t0) {
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  for (let i = 0; i < NG; i++) {
+    const s = t0 == null ? 0 : clamp(spring(t - t0 - i * 0.045, 2.0, 0.55));
+    const [x, z] = guests[i], sv = new THREE.Vector3(s, s, s);
+    if (s <= 0.001) { m.makeScale(0, 0, 0); gBody.setMatrixAt(i, m); gHead.setMatrixAt(i, m); continue; }
+    const hop = Math.abs(Math.sin(t * 5 + i)) * 0.08;
+    m.compose(new THREE.Vector3(x, 0.55 * s + hop, z), q, sv); gBody.setMatrixAt(i, m);
+    m.compose(new THREE.Vector3(x, 1.27 * s + hop, z), q, sv); gHead.setMatrixAt(i, m);
+  }
+  gBody.instanceMatrix.needsUpdate = gHead.instanceMatrix.needsUpdate = true;
+}
+
+// ================= garrafão de água e balança =================
+const jug = new THREE.Group(); scene.add(jug); jug.visible = false;
+{ const b = cyl(0.3, 0.3, 0.75, 10, M(0x6FC3F0, { transparent: true, opacity: 0.8 })); b.position.y = 0.4; jug.add(b); const nk = cyl(0.08, 0.12, 0.2, 8, M(0x2E7EC0)); nk.position.y = 0.88; jug.add(nk); }
+const scaleG = new THREE.Group(); scene.add(scaleG); scaleG.visible = false;
+{ const b = box(1.4, 0.18, 1.0, M(0xE8E8EC)); b.position.y = 0.09; scaleG.add(b); const d = box(0.6, 0.02, 0.2, M(0x223344, { emissive: 0x112233 })); d.position.set(0, 0.19, 0.38); scaleG.add(d); }
+const scalePile = new THREE.InstancedMesh(PG, PMAT, 30); scalePile.castShadow = true; scaleG.add(scalePile);
+{ const m = new THREE.Matrix4(), q = new THREE.Quaternion(); for (let i = 0; i < 30; i++) { const L = i < 14 ? 0 : i < 23 ? 1 : i < 28 ? 2 : 3, r = 0.45 * (1 - L / 4.2), a = i * 2.4; q.setFromEuler(new THREE.Euler(0, hash(i) * 6, 0)); m.compose(new THREE.Vector3(Math.cos(a) * r * hash(i + 2), 0.25 + L * 0.12, Math.sin(a) * r * 0.6 * hash(i + 5)), q, new THREE.Vector3(1, 1, 1)); scalePile.setMatrixAt(i, m); } }
+scaleG.position.set(0.9, 0, 1.4);
+
+// ================= boneco (capacete + colete + bigode + barriga) =================
+const SKIN = 0xE3B08C;
+const guyMats = [];
+const GM = (c, e = {}) => { const m = M(c, { transparent: true, ...e }); guyMats.push(m); return m; };
+function person() {
+  const g = new THREE.Group(), P = {};
+  const body = new THREE.Group(); g.add(body); P.body = body;
+  for (const sx of [-1, 1]) { const leg = box(0.17, 0.86, 0.2, GM(0x2F3A56)); leg.position.set(sx * 0.11, 0.43, 0); g.add(leg); const sh = box(0.19, 0.1, 0.28, GM(0x3B2A20)); sh.position.set(sx * 0.11, 0.05, 0.04); g.add(sh); if (sx > 0) P.footR = sh; }
+  const torso = box(0.5, 0.66, 0.28, GM(0x3D7CC9)); torso.position.y = 1.19; body.add(torso);
+  const vest = box(0.52, 0.5, 0.3, GM(0xFF8A1E)); vest.position.y = 1.2; body.add(vest);
+  const stripe = box(0.53, 0.05, 0.31, GM(0xF4F4F4)); stripe.position.y = 1.12; body.add(stripe);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), GM(0x3D7CC9)); belly.castShadow = true; belly.position.set(0, 1.08, 0.06); belly.scale.set(1, 1, 0.55); body.add(belly); P.belly = belly;
+  const btns = [];
+  for (let i = 0; i < 3; i++) { const b = box(0.04, 0.04, 0.02, GM(0xF4F4F4)); b.position.set(0, 1.0 + i * 0.1, 0.17); body.add(b); btns.push(b); }
+  P.btns = btns;
+  for (const sx of [-1, 1]) {
+    const piv = new THREE.Group(); piv.position.set(sx * 0.32, 1.47, 0);
+    const arm = box(0.13, 0.62, 0.15, GM(0x3D7CC9)); arm.position.y = -0.31; piv.add(arm);
+    const hand = box(0.12, 0.12, 0.13, GM(SKIN)); hand.position.y = -0.66; piv.add(hand);
+    g.add(piv); P[sx < 0 ? "armL" : "armR"] = piv;
+  }
+  const head = new THREE.Group(); head.position.y = 1.68; g.add(head); P.head = head;
+  const skinMat = GM(SKIN); P.skinMat = skinMat;
+  const hd = new THREE.Mesh(new THREE.SphereGeometry(0.155, 14, 10), skinMat); hd.scale.set(1, 1.15, 1); hd.castShadow = true; head.add(hd);
+  for (const sx of [-1, 1]) { const e = box(0.035, 0.04, 0.02, GM(0x111111)); e.position.set(sx * 0.055, 0.03, 0.15); head.add(e); P[sx < 0 ? "eyeL" : "eyeR"] = e; }
+  const mouth = box(0.07, 0.02, 0.02, GM(0x7A2E2E)); mouth.position.set(0, -0.06, 0.15); head.add(mouth); P.mouth = mouth;
+  const mus = box(0.14, 0.03, 0.03, GM(0x3A2618)); mus.position.set(0, -0.025, 0.155); head.add(mus);
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.175, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), GM(0xFFD21F)); helmet.position.y = 0.05; head.add(helmet);
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.025, 16), GM(0xFFD21F)); brim.position.set(0, 0.05, 0.03); head.add(brim);
+  // garfo de churrasco na mão direita
+  const fork = new THREE.Group(); const fh = box(0.04, 0.5, 0.04, GM(0x8A5A32)); fh.position.y = -0.2; fork.add(fh);
+  const fm = box(0.02, 0.35, 0.02, GM(0xC8C8C8, { metalness: 0.6 })); fm.position.y = -0.6; fork.add(fm);
+  fork.position.set(0, -0.62, 0.05); P.armR.add(fork); P.fork = fork;
+  g.userData.P = P; return g;
+}
+const guy = person(); guy.scale.setScalar(1.15); scene.add(guy);
+// estômago (raio-x): volume -> raio ∝ raiz cúbica
+const stomach = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshStandardMaterial({ color: 0xF07A8A, roughness: 0.5, emissive: 0x5A1020 }));
+stomach.scale.set(1, 0.8, 0.8); stomach.visible = false; guy.add(stomach);
+const ghost = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshStandardMaterial({ color: 0xFF3B3B, transparent: true, opacity: 0.35, roughness: 0.4, depthWrite: false }));
+ghost.visible = false; guy.add(ghost);
+const R05 = 0.075; const rOf = L => R05 * Math.cbrt(L / 0.5);
+function setGhostBody(k) { guyMats.forEach(m => { m.opacity = lerp(1, 0.22, k); m.depthWrite = k < 0.5; }); }
+function setBelly(P, b) { P.belly.scale.set(b, b, 0.55 * b); P.belly.position.set(0, 1.08 - 0.03 * (b - 1), 0.06 + 0.11 * (b - 1)); P.btns.forEach((x, i) => { x.position.z = 0.17 + 0.2 * (b - 1); x.position.y = 1.0 + i * 0.1 - 0.02 * (b - 1); }); }
+
+// ================= botões voando =================
+function drawButtons(P, t, t0) {
+  P.btns.forEach((b, i) => { const k = t - t0 - i * 0.05; if (k <= 0) return; b.position.z += 1.2 * k; b.position.y += 1.5 * k - 4.9 * k * k; b.position.x = (i - 1) * 0.5 * k; b.rotation.set(k * 10, k * 7, 0); });
+}
+
+// ================= HUD =================
+const out = document.getElementById("out"), ctx = out.getContext("2d");
+const KEY = new Set(["quinze", "quilos", "picanha", "quatrocentos", "gramas", "trinta", "sete", "pessoas", "trezentas", "calorias", "quarenta", "três", "mil", "semanas", "estômago", "meio", "litro", "quatro", "litros", "catorze", "balão", "diafragma", "ânsia", "vômito", "falta", "ar", "proteína", "fígado", "rins", "sede", "intestino", "trava", "cinco", "gordura", "ácido", "úrico", "gota", "criança", "anos", "comenta", "tente", "sozinho", "tudo", "mesa", "hora", "dia", "semana", "absurda"]);
+function shadowText(on) { ctx.shadowColor = on ? "rgba(0,0,0,.5)" : "transparent"; ctx.shadowBlur = on ? 14 : 0; ctx.shadowOffsetY = on ? 2 : 0; }
+const CAPS = (() => {
+  const out = []; let cur = [];
+  const flush = () => { if (cur.length) { out.push({ words: cur.map(w => w.w), s: cur[0].s, e: cur[cur.length - 1].e }); cur = []; } };
+  TL.words.forEach((w, i) => { cur.push(w); const next = TL.words[i + 1]; if (cur.length >= 3 || /[.,?!:…]$/.test(w.w) || !next || next.seg !== w.seg || next.s - w.e > 0.35) flush(); });
+  for (let i = 0; i < out.length; i++) out[i].until = i + 1 < out.length ? Math.min(out[i + 1].s, out[i].e + 0.6) : out[i].e + 0.6;
+  return out;
+})();
+function captions(t) {
+  const c = CAPS.find(c => t >= c.s - 0.05 && t < c.until); if (!c) return;
+  const pop = spring(t - c.s + 0.05, 2.4, 0.55);
+  ctx.save(); ctx.translate(W / 2, 1400); ctx.scale(0.85 + 0.15 * pop, 0.85 + 0.15 * pop);
+  ctx.font = '900 92px "Inter"'; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  const words = c.words.map(w => w.toUpperCase()), sp = 26, ws = words.map(w => ctx.measureText(w).width);
+  let total = ws.reduce((a, b) => a + b, 0) + sp * (words.length - 1), scale = Math.min(1, 980 / total);
+  ctx.scale(scale, scale); let x = -total / 2;
+  words.forEach((w, i) => {
+    const raw = c.words[i].toLowerCase().replace(/[^a-zà-ú0-9]/g, "");
+    ctx.lineWidth = 16; ctx.strokeStyle = "#111"; ctx.strokeText(w, x, 0);
+    ctx.fillStyle = KEY.has(raw) ? "#FFD21F" : "#FFFFFF"; ctx.fillText(w, x, 0); x += ws[i] + sp;
+  });
+  ctx.restore();
+}
+function tag(text, x, y, a, color = "#FFD21F", size = 40) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); ctx.font = `900 ${size}px "Inter"`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  const s = 0.6 + 0.4 * clamp(a); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.lineWidth = 12; ctx.strokeStyle = "#111"; ctx.strokeText(text, 0, 0); ctx.fillStyle = color; ctx.fillText(text, 0, 0); ctx.restore();
+}
+function pill(text, x, y, a, ok) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); ctx.font = '800 34px "Inter"'; const w = ctx.measureText(text).width + 110;
+  ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.beginPath(); ctx.roundRect(x - w / 2, y - 34, w, 68, 34); ctx.fill();
+  ctx.fillStyle = ok ? "#1E9E52" : "#E0383E"; ctx.beginPath(); ctx.arc(x - w / 2 + 38, y, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#222"; ctx.textBaseline = "middle"; ctx.fillText(text, x - w / 2 + 70, y + 1);
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.beginPath();
+  if (ok) { ctx.moveTo(x - w / 2 + 29, y); ctx.lineTo(x - w / 2 + 36, y + 8); ctx.lineTo(x - w / 2 + 48, y - 8); } else { ctx.moveTo(x - w / 2 + 31, y - 7); ctx.lineTo(x - w / 2 + 45, y + 7); ctx.moveTo(x - w / 2 + 45, y - 7); ctx.lineTo(x - w / 2 + 31, y + 7); }
+  ctx.stroke(); ctx.restore();
+}
+function counter(label, value, sub, a, color = "#fff") {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); shadowText(true); ctx.fillStyle = "#fff";
+  ctx.font = '800 34px "Inter"'; ctx.letterSpacing = "5px"; ctx.fillText(label, 64, 330); ctx.letterSpacing = "0px";
+  ctx.fillStyle = color; ctx.font = '700 128px "Crimson Text"'; ctx.fillText(value, 58, 450);
+  ctx.fillStyle = "#fff"; ctx.font = '800 28px "Inter"'; ctx.letterSpacing = "3px"; ctx.fillText(sub, 64, 500); ctx.restore();
+}
+// faixa de tempo (1 HORA / 1 DIA / 1 SEMANA)
+function stamp(text, a) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); ctx.translate(W - 70, 300); const s = 0.7 + 0.3 * clamp(a); ctx.scale(s, s);
+  ctx.font = '900 54px "Inter"'; ctx.textAlign = "right"; ctx.textBaseline = "middle"; const w = ctx.measureText(text).width + 50;
+  ctx.fillStyle = "#E0383E"; ctx.beginPath(); ctx.roundRect(-w, -42, w, 84, 18); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.fillText(text, -25, 3); ctx.restore();
+}
+function project(v) { const p = new THREE.Vector3(...v).project(camera); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H, p.z]; }
+function handle() { ctx.save(); ctx.globalAlpha = 0.9; shadowText(true); ctx.fillStyle = "#fff"; ctx.font = '800 30px "Inter"'; ctx.letterSpacing = "2px"; ctx.textAlign = "right"; ctx.fillText("@to.scale8", W - 56, 210); ctx.restore(); }
+
+// ================= câmera =================
+function look(a, b, k) { const p = a.p.map((v, i) => lerp(v, b.p[i], k)), q = a.q.map((v, i) => lerp(v, b.q[i], k)); camera.position.set(...p); camera.lookAt(...q); }
+function shotPair(lt, dur, A, B, cut = 0.5) {
+  const tc = dur * cut;
+  if (lt < tc) look(A[0], A[1], easeInOut(lt / tc)); else look(B[0], B[1], easeInOut((lt - tc) / (dur - tc)));
+}
+const S = (p, q) => ({ p, q });
+function pose(P, o) { P.armR.rotation.set(o.rx || 0, 0, o.rz ?? 0.05); P.armL.rotation.set(o.lx || 0, 0, o.lz ?? -0.05); P.head.rotation.set(o.hx || 0, o.hy || 0, 0); }
+
+// ================= seek =================
+window.seek = function (t) {
+  const seg = TL.segs.find(s => t >= s.start && t < s.end) || TL.segs[TL.segs.length - 1];
+  const lt = t - seg.start, dur = seg.end - seg.start, P = guy.userData.P;
+  // tempos-chave
+  const tMesa = wordTime("escala", "mesa") ?? SEG.escala.start + 5;
+  const tEat0 = (wordTime("come", "vamos") ?? SEG.come.start + 1.2), tEat1 = SEG.come.end + 0.2;
+  const tBalao = wordTime("hora", "balão") ?? SEG.hora.start + 2;
+  const tFall = (wordTime("hora", "devolver") ?? SEG.hora.end - 1) + 0.6;
+  // padrões
+  drawSmoke(t); drawGuests(t, null); drawFlyers(t, -1, -1, new THREE.Vector3());
+  setTableBreak(t > tMesa ? easeOut(prog(t, tMesa + 0.25, tMesa + 0.7)) * 1 : 0);
+  table.visible = true; jug.visible = false; scaleG.visible = false; stomach.visible = false; ghost.visible = false;
+  setGhostBody(0); P.skinMat.color.setHex(SKIN); P.mouth.scale.set(1, 1, 1); P.fork.visible = true;
+  P.body.scale.set(1, 1, 1); guy.scale.setScalar(1.15); P.footR.material.emissive?.setHex(0);
+  guy.position.set(-1.25, 0, 0.9); guy.rotation.set(0, 0.55, 0); pose(P, {}); P.btns.forEach(b => { b.visible = true; b.rotation.set(0, 0, 0); b.position.x = 0; }); setBelly(P, 1);
+  let visible = NP;
+  if (t > tEat0) visible = NP * (1 - easeInOut(prog(t, tEat0, tEat1)));
+  if (t > SEG.virada.start) visible = 0;
+  drawPile(visible);
+  const hud = [];
+
+  if (seg.id === "hook") {
+    pose(P, { rx: -0.9 + 0.1 * Math.sin(t * 3), rz: 0.1, lx: -0.2, hy: 0.4 * Math.sin(Math.PI * prog(lt, 0.6, 2.4)) }); P.mouth.scale.set(1.2, 2.2, 1);
+    shotPair(lt, dur, [S([0.3, 2.3, 6.4], [-0.4, 1.55, 0.5]), S([0.4, 2.4, 7.0], [-0.3, 1.5, 0.4])], [S([1.2, 3.8, 9.5], [0.4, 1.2, 0]), S([1.0, 3.4, 8.6], [0.4, 1.2, 0])], 0.6);
+  } else if (seg.id === "escala") {
+    const t37 = wordTime("escala", "trinta") ?? seg.start + 3, t400 = wordTime("escala", "quatrocentos") ?? seg.start + 1.5;
+    drawGuests(t, t37 - 0.2);
+    pose(P, { rx: -0.5, lx: -0.5, lz: -0.3, rz: 0.3, hy: -0.2 });
+    if (t > tMesa) { P.mouth.scale.set(1.5, 3, 1); pose(P, { rx: -2.6, lx: -2.6, rz: 0.5, lz: -0.5 }); }
+    const sh = t > tMesa + 0.25 && t < tMesa + 0.9 ? Math.sin(t * 80) * 0.05 : 0;
+    const c1 = clamp((t37 - 0.4 - seg.start) / dur, 0.2, 0.8), c2 = (tMesa - 0.5 - seg.start) / dur;
+    if (lt < dur * c1) look(S([2.2, 1.9, 3.4], [1.5, 1.05, 0.5]), S([2.0, 1.8, 3.1], [1.5, 1.05, 0.5]), easeInOut(lt / (dur * c1)));
+    else if (t < tMesa - 0.5) look(S([0.4, 5.5, 11.5], [0, 1.0, -1.2]), S([0.4, 5.2, 10.8], [0, 1.0, -1.2]), easeInOut((lt - dur * c1) / (dur * (c2 - c1))));
+    else look(S([2.8 + sh, 2.0, 4.6], [0.6, 0.8, 0.2]), S([2.6 + sh, 1.9, 4.2], [0.6, 0.8, 0.2]), easeInOut(prog(t, tMesa - 0.5, seg.end)));
+    if (t < t37 - 0.4) hud.push(["counter", "PORÇÃO POR PESSOA", "~400 g", "NUM CHURRASCO NORMAL", clamp((t - t400 + 0.2) / 0.3)]);
+    else hud.push(["counter", "15 KG DE PICANHA", "~37", "PESSOAS ALIMENTADAS", 1, "#FFD21F"]);
+  } else if (seg.id === "numeros") {
+    const t43 = wordTime("numeros", "quarenta") ?? seg.start + 3, tsem = wordTime("numeros", "semanas") ?? seg.start + 5;
+    pose(P, { rx: -0.6, rz: 0.2, hy: 0.3 });
+    const ang = 0.25 + lt * 0.07;
+    look(S([0.6 + Math.sin(ang) * 6.2, 3.4, 0.2 + Math.cos(ang) * 6.2], [0.2, 1.0, 0.2]), S([0.6 + Math.sin(ang) * 6.2, 3.4, 0.2 + Math.cos(ang) * 6.2], [0.2, 1.0, 0.2]), 0);
+    if (t < t43) hud.push(["counter", "PICANHA COM GORDURA", "289", "KCAL A CADA 100 G (TACO)", clamp(lt / 0.3)]);
+    else hud.push(["counter", "CALORIAS NO TOTAL", "~" + Math.round(43 * easeOut(prog(t, t43, t43 + 1.6))) + " mil", t > tsem ? "≈ 3 SEMANAS DE COMIDA" : "KCAL", 1, "#FFD21F"]);
+  } else if (seg.id === "estomago") {
+    const tv = wordTime("estomago", "vazio") ?? seg.start + 1.5, tm = wordTime("estomago", "esticado") ?? seg.start + 3, t14 = wordTime("estomago", "quinze") ?? seg.start + 5;
+    setGhostBody(easeInOut(prog(lt, 0.3, 1.0))); stomach.visible = true;
+    const L = t < tm ? 0.5 : lerp(0.5, 4, easeOut(prog(t, tm, tm + 1.2)));
+    const r = rOf(L); stomach.scale.set(r, r * 0.8, r * 0.8); stomach.position.set(0.02, 1.08 + r * 0.2, 0.02);
+    if (t > t14) { const g = spring(t - t14 - 0.6, 1.4, 0.6), rg = rOf(14) * g; ghost.visible = g > 0.01; ghost.scale.set(rg, rg * 0.85, rg * 0.85); ghost.position.set(0.02, 1.12, 0.05); }
+    guy.rotation.y = 0.15; pose(P, { rz: 0.15, lz: -0.15 });
+    look(S([0.3, 1.9, 4.4], [-1.15, 1.5, 0.85]), S([0.1, 1.85, 4.0], [-1.15, 1.45, 0.85]), easeInOut(lt / dur));
+    const v = t < tv ? "" : t < tm ? "0,5 L" : t < t14 ? "~4 L" : "~14 L";
+    hud.push(["counter", t < t14 ? "SEU ESTÔMAGO" : "15 KG DE PICANHA", v, t < tm ? "VAZIO" : t < t14 ? "ESTICADO AO MÁXIMO" : "NÃO CABE NEM DE LONGE", clamp(lt / 0.3), t >= t14 ? "#FF5A4E" : "#fff"]);
+  } else if (seg.id === "come") {
+    const k = prog(t, tEat0, tEat1);
+    setBelly(P, 1 + 1.4 * easeInOut(k));
+    const chew = Math.sin(t * 14);
+    pose(P, t > tEat0 ? { rx: -1.9 + 0.5 * chew, rz: -0.35, lx: -0.9 - 0.3 * Math.sin(t * 11), hy: 0.2 } : { rx: -0.8, rz: 0.2 });
+    P.mouth.scale.set(1.4, t > tEat0 ? 2 + 2 * Math.abs(chew) : 1, 1);
+    const mw = new THREE.Vector3(); P.mouth.getWorldPosition(mw); drawFlyers(t, tEat0, tEat1, mw);
+    look(S([1.0, 2.2, 6.0], [-0.4, 1.25, 0.5]), S([0.8, 2.1, 5.3], [-0.5, 1.25, 0.6]), easeInOut(lt / dur));
+    hud.push(["counter", "PICANHA NA MESA", (15 * (1 - easeInOut(k))).toFixed(1).replace(".", ",") + " kg", "COMENDO SOZINHO", clamp(lt / 0.3), "#FFD21F"]);
+  } else if (seg.id === "hora") {
+    const k = easeOut(prog(t, tBalao - 0.3, tFall - 0.2));
+    const b = 2.4 + 1.0 * k + 0.05 * Math.sin(t * 9) * k;
+    setBelly(P, b); P.skinMat.color.lerpColors(new THREE.Color(SKIN), new THREE.Color(0x9CC48A), prog(t, tBalao + 1.5, tFall - 0.5));
+    P.fork.visible = false;
+    const tBreath = wordTime("hora", "falta") ?? tBalao + 2, tEnj = wordTime("hora", "ânsia") ?? tBalao + 4;
+    pose(P, { rx: -0.5 - 0.3 * Math.sin(t * 6) * prog(t, tBreath, tBreath + 0.5), lx: -0.5, rz: 0.7, lz: -0.7, hx: -0.2 });
+    P.mouth.scale.set(1.3, t > tBreath ? 2.5 + Math.abs(Math.sin(t * 7)) * 2 : 1.5, 1);
+    if (t > tFall) {
+      drawButtons(P, t, tFall);
+      const f = easeOut(prog(t, tFall, tFall + 0.7)); guy.rotation.x = -1.45 * f; guy.position.y = 0.25 * f + 0.15 * Math.sin(Math.PI * f); guy.position.z = 0.9 - 0.6 * f;
+    }
+    const shk = t > tFall && t < tFall + 0.6 ? Math.sin(t * 90) * 0.05 : 0;
+    shotPair(lt, dur, [S([0.5, 2.2, 5.8], [-1.2, 2.2, 0.85]), S([0.3, 2.15, 5.3], [-1.2, 2.15, 0.85])], [S([1.6 + shk, 3.0, 5.8], [-1.3, 0.7, 0.5]), S([1.4 + shk, 2.8, 5.3], [-1.3, 0.6, 0.4])], clamp((tFall - 1.8 - seg.start) / dur, 0.3, 0.8));
+    hud.push(["counter", "ESTÔMAGO", t > tBalao ? "~" + Math.round(lerp(4, 14, k)) + " L" : "~4 L", "MUITO ALÉM DO LIMITE", clamp(lt / 0.3), "#FF5A4E"]);
+    hud.push(["stamp", "1 HORA", clamp(spring(lt, 1.6, 0.6))]);
+    const pa = 1 - prog(t, tFall - 0.4, tFall);
+    hud.push(["pill", "ESTÔMAGO ESTICADO", 540, 620, pa * clamp((t - tBalao) / 0.3), false]);
+    hud.push(["pill", "FALTA DE AR", 540, 710, pa * clamp((t - tBreath) / 0.3), false]);
+    hud.push(["pill", "ÂNSIA DE VÔMITO", 540, 800, pa * clamp((t - tEnj) / 0.3), false]);
+  } else if (seg.id === "dia") {
+    // deitado no chão, barriga para cima
+    guy.rotation.set(-1.45, 0.55, 0); guy.position.set(-1.25, 0.25, 0.3); setBelly(P, 3.2 + 0.08 * Math.sin(t * 2)); P.fork.visible = false;
+    P.skinMat.color.setHex(0xB8C98E); pose(P, { rz: 1.2, lz: -1.2 }); P.mouth.scale.set(1.4, 2 + Math.sin(t * 3), 1);
+    P.btns.forEach(b => b.visible = false);
+    const tp = wordTime("dia", "proteína") ?? seg.start + 2, tf = wordTime("dia", "fígado") ?? seg.start + 4, ts = wordTime("dia", "sede") ?? seg.start + 6, ti = wordTime("dia", "intestino") ?? seg.start + 8;
+    if (t > ts) { jug.visible = true; const s = spring(t - ts, 1.8, 0.55); jug.scale.setScalar(Math.max(0.01, s) * 1.0); jug.position.set(-0.3, 0, 0.9); }
+    shotPair(lt, dur, [S([-1.6, 6.4, 2.6], [-1.7, 0.5, -0.4]), S([-1.6, 6.0, 2.4], [-1.7, 0.5, -0.4])], [S([1.0, 3.4, 4.0], [-1.3, 0.6, -0.1]), S([0.8, 3.2, 3.7], [-1.3, 0.6, -0.1])], clamp((ts - 0.3 - seg.start) / dur, 0.3, 0.8));
+    hud.push(["counter", "PROTEÍNA", "~4 kg", "PRA DIGERIR (~60 G É O DE UM DIA)", clamp((t - tp + 0.2) / 0.3), "#FFD21F"]);
+    hud.push(["stamp", "1 DIA", clamp(spring(lt, 1.6, 0.6))]);
+    hud.push(["pill", "FÍGADO E RINS NO LIMITE", 540, 620, clamp((t - tf) / 0.3), false]);
+    hud.push(["pill", "SEDE ENORME", 540, 710, clamp((t - ts) / 0.3), false]);
+    hud.push(["pill", "INTESTINO TRAVADO", 540, 800, clamp((t - ti) / 0.3), false]);
+  } else if (seg.id === "semana") {
+    const tg = wordTime("semana", "cinco") ?? seg.start + 2, tu = wordTime("semana", "ácido") ?? seg.start + 4, tgo = wordTime("semana", "gota") ?? seg.end - 1;
+    const fat = easeOut(prog(t, tg, tg + 1.2));
+    P.body.scale.set(1 + 0.45 * fat, 1, 1 + 0.6 * fat); setBelly(P, 1.3 + 0.8 * fat); P.fork.visible = false;
+    guy.rotation.y = 0.35; pose(P, { rz: 0.35 + 0.3 * fat, lz: -0.35 - 0.3 * fat, hy: -0.2 }); P.mouth.scale.set(1, 1.4, 1);
+    const red = 0.5 + 0.5 * Math.sin(t * 9); if (t > tgo) { P.footR.material.emissive.setRGB(1.4 * red, 0.05, 0.02); }
+    look(S([0.9, 2.3, 7.4], [-1.25, 1.6, 0.9]), S([0.7, 2.2, 6.8], [-1.25, 1.6, 0.9]), easeInOut(lt / dur));
+    hud.push(["counter", "EM 1 SEMANA", t > tg ? "+~5 kg" : "", "DE GORDURA ESTOCADA", clamp(lt / 0.3), "#FFD21F"]);
+    hud.push(["stamp", "1 SEMANA", clamp(spring(lt, 1.6, 0.6))]);
+    hud.push(["pill", "ÁCIDO ÚRICO ALTO", 540, 620, clamp((t - tu) / 0.3), false]);
+    hud.push(["pill", "RISCO DE CRISE DE GOTA", 540, 710, clamp((t - tgo) / 0.3), false]);
+  } else if (seg.id === "virada") {
+    const tc = wordTime("virada", "quinze") ?? seg.start + 1.8, tn = wordTime("virada", "nem") ?? seg.start + 5;
+    scaleG.visible = true; const s = spring(t - tc + 0.3, 1.6, 0.6); scaleG.scale.setScalar(Math.max(0.01, s));
+    guy.position.set(-0.9, 0, 1.6); guy.rotation.y = 0.7; pose(P, { rx: -1.2, rz: -0.2, hy: 0.4 }); P.mouth.scale.set(1.2, 3, 1); P.fork.visible = false;
+    look(S([0.6, 3.0, 7.6], [-0.1, 1.3, 1.4]), S([0.5, 2.8, 7.0], [-0.1, 1.3, 1.4]), easeInOut(lt / dur));
+    if (t > tc) hud.push(["counter", "15 KG DE PICANHA", "15 kg", "CRIANÇA DE 3 ANOS: ~14 KG", clamp((t - tc) / 0.3), "#FFD21F"]);
+    hud.push(["pill", "NEM CAMPEÕES CHEGAM PERTO", 540, 590, clamp((t - tn) / 0.3), false]);
+  } else if (seg.id === "cta") {
+    table.visible = true; guy.position.set(-0.6, 0, 1.7); guy.rotation.y = 0.15;
+    pose(P, { rz: 0.4 + 2.2 * spring(lt - 0.3, 1.2, 0.5), rx: -0.3 }); P.mouth.scale.set(1, 2.5, 1);
+    look(S([0.6, 2.8, 7.8], [0.0, 1.75, 0.6]), S([0.5, 2.6, 7.0], [0.0, 1.7, 0.6]), easeInOut(lt / dur));
+  }
+
+  renderer.render(scene, camera);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.drawImage(glCanvas, 0, 0, W, H);
+  handle();
+
+  if (seg.id === "hook") {
+    const a = 1 - prog(lt, dur - 0.25, dur);
+    const s1 = spring(lt - 0.05, 1.6, 0.7), s2 = spring(lt - 0.3, 1.3, 0.5), s3 = spring(lt - 0.55, 1.6, 0.7);
+    ctx.save(); ctx.textAlign = "center"; ctx.lineJoin = "round";
+    ctx.globalAlpha = a * clamp(s1 * 1.5); ctx.font = '800 66px "Inter"'; ctx.lineWidth = 12; ctx.strokeStyle = "#111"; ctx.strokeText("E se você comesse", W / 2, 360 + 30 * (1 - s1)); ctx.fillStyle = "#fff"; ctx.fillText("E se você comesse", W / 2, 360 + 30 * (1 - s1));
+    ctx.save(); ctx.globalAlpha = a * clamp(s2 * 1.5); ctx.translate(W / 2, 500); ctx.scale(0.75 + 0.25 * s2, 0.75 + 0.25 * s2);
+    ctx.font = '900 130px "Inter"'; ctx.lineWidth = 20; ctx.strokeText("15 KG DE", 0, 0); ctx.fillStyle = "#FFD21F"; ctx.fillText("15 KG DE", 0, 0);
+    ctx.strokeText("PICANHA", 0, 130); ctx.fillText("PICANHA", 0, 130); ctx.restore();
+    ctx.globalAlpha = a * clamp(s3 * 1.5); ctx.font = '800 66px "Inter"'; ctx.lineWidth = 12; ctx.strokeText("num churrasco?", W / 2, 730 + 30 * (1 - s3)); ctx.fillStyle = "#fff"; ctx.fillText("num churrasco?", W / 2, 730 + 30 * (1 - s3));
+    ctx.restore();
+  }
+  if (seg.id === "escala" && t > tMesa + 0.25) { const q = project([0.6, 0.6, 0.9]); tag("CRACK!", q[0], q[1] - 60, 1 - prog(t, tMesa + 1.2, tMesa + 1.6), "#FFFFFF", 100); }
+  if (seg.id === "escala") { const t37 = wordTime("escala", "trinta") ?? seg.start + 3; if (t > t37 - 0.4 && t < tMesa - 0.5) { const q = project([0, 2.0, -2.5]); tag("37 CONVIDADOS", q[0], q[1] - 30, clamp((t - t37) / 0.3), "#FFD21F", 58); } }
+  if (seg.id === "estomago") {
+    const t14 = wordTime("estomago", "quinze") ?? seg.start + 5;
+    const q = project([-1.25, 1.35, 0.9]);
+    if (t > t14 + 0.6) tag("~14 L", q[0] + 230, q[1] - 160, clamp((t - t14 - 0.6) / 0.3), "#FF5A4E", 72);
+  }
+  if (seg.id === "hora" && t > tFall) tag("BUUURP!", W / 2, 1120, 1 - prog(t, tFall + 1.2, tFall + 1.6), "#FFFFFF", 120);
+  if (seg.id === "semana") { const tgo = wordTime("semana", "gota") ?? seg.end - 1; const q = project([-1.1, 0.1, 1.0]); tag("GOTA!", W / 2 + 250, 1180, clamp((t - tgo) / 0.3), "#FF5A4E", 64); }
+  if (seg.id === "virada") { const tc = wordTime("virada", "quinze") ?? seg.start + 1.8; const q = project([0.9, 0.3, 1.9]); tag("15,0 kg", q[0], q[1] - 150, clamp((t - tc) / 0.3), "#7CE4FF", 60); }
+  for (const h of hud) {
+    if (h[0] === "counter") counter(h[1], h[2], h[3], h[4], h[5]);
+    if (h[0] === "pill") pill(h[1], h[2], h[3], h[4], h[5]);
+    if (h[0] === "stamp") stamp(h[1], h[2]);
+  }
+  if (seg.id === "cta") {
+    const a = clamp(spring(lt - 0.2, 1.4, 0.7) * 1.3);
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.textAlign = "center"; ctx.lineJoin = "round"; ctx.font = '900 92px "Inter"'; ctx.lineWidth = 18; ctx.strokeStyle = "#111";
+    ctx.strokeText("NÃO TENTE ISSO", W / 2, 300); ctx.fillStyle = "#FF5A4E"; ctx.fillText("NÃO TENTE ISSO", W / 2, 300);
+    ctx.fillStyle = "#FFD21F"; ctx.beginPath(); ctx.roundRect(110, 370, 860, 250, 28); ctx.fill();
+    ctx.fillStyle = "#111"; ctx.font = '900 62px "Inter"'; ctx.fillText("Qual exagero de comida", W / 2, 470); ctx.fillText("vem a seguir?", W / 2, 550);
+    ctx.font = '900 58px "Inter"'; ctx.fillStyle = "#fff"; ctx.lineWidth = 14; ctx.strokeText("COMENTA ↓", W / 2, 700); ctx.fillText("COMENTA ↓", W / 2, 700);
+    ctx.font = '700 28px "Inter"'; ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = 6;
+    ctx.strokeText("Ilustração exagerada. Não tente isso.", W / 2, 1830); ctx.fillText("Ilustração exagerada. Não tente isso.", W / 2, 1830);
+    ctx.restore();
+  }
+  captions(t);
+};
+window.DURATION = DURATION;
+Promise.all(['900 92px "Inter"', '800 34px "Inter"', '700 128px "Crimson Text"'].map(f => document.fonts.load(f))).then(() => { window.seek(0); window.READY = true; });
+</script>
+</body></html>
