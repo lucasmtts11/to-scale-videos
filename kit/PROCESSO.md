@@ -44,6 +44,9 @@ Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infr
 1. `pip install --break-system-packages chatterbox-tts faster-whisper soundfile` (torch já vem);
    three.js: `npm install three@0.170.0`; Playwright fica em /opt/npm-tools e o Chrome em /usr/bin/google-chrome.
 2. Escolher o próximo tema de `temas.md` que não esteja em `usados.md`. Pesquisar os números.
+   ANTES de escolher: `git pull` e conferir `usados.md` E os posts recentes no Buffer (list_posts). Em 25/11 duas
+   execuções rodaram em paralelo e as duas fizeram o ep04 (picanha); a segunda perdeu ~1h30 de TTS/render.
+   Repetir a conferência antes de subir o vídeo: se o tema já apareceu no main, não subir duplicado.
 3. Escrever `roteiro.json` (ids de trecho + frases com " | ").
 4. `python3 tts.py` (≈1,5 min por trecho em CPU) → `python3 build_timeline.py` → gera timeline.js/json e voz_total.wav.
 5. Escrever `cena.html` (copiar a base do pilar.html; trocar modelo 3D, tomadas e HUD por trecho;
