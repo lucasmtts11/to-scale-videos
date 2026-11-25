@@ -1,0 +1,11 @@
+[
+  {"id": "hook",     "text": "E se você tirasse um pilar dessa casa... o que aconteceria? | Só um pilar. | Bem no meio da sala."},
+  {"id": "esqueleto","text": "Pra entender, olha o esqueleto da casa. | Laje, viga, pilar e fundação. | Cada peça segura a de cima."},
+  {"id": "cargas",   "text": "O peso da laje desce pras vigas. | Das vigas, pros pilares. | E dos pilares, pra fundação. | Esse pilar aqui segura umas dez toneladas."},
+  {"id": "tira",     "text": "Agora... | Tira ele."},
+  {"id": "vao",      "text": "A viga tinha apoio a cada quatro metros. | Agora, precisa vencer oito. | E aqui vem a parte que ninguém te conta: | dobrar o vão não dobra a deformação. | Multiplica por dezesseis."},
+  {"id": "trincas",  "text": "A viga começa a envergar. | Aparecem trincas na parede. | As portas emperram. | E a laje desce."},
+  {"id": "domino",   "text": "Se a viga não aguentar, o peso vai todo pros pilares vizinhos. | Eles não foram feitos pra isso. | Aí vira efeito dominó."},
+  {"id": "certo",    "text": "Então... não dá pra tirar pilar nunca? | Dá. | Mas, do jeito certo. | Escora tudo antes. | Um engenheiro calcula. | E entra uma viga de transição, bem mais forte."},
+  {"id": "cta",      "text": "E aí? | Qual parede da sua casa você derrubaria? | Comenta aqui embaixo."}
+]
