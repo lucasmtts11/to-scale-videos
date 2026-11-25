@@ -1,19 +1,26 @@
-# Processo de produção — @to.scale8 (formato "E se...?" de engenharia em low-poly)
+# Processo de produção — @to.scale8 (formato "E se...?" em low-poly: comida exagerada, absurdo geral e engenharia de vez em quando)
 
 Referência pronta: `exemplo-ep03/` (vídeo publicado: videos/ep03-tirar-um-pilar-v2.mp4).
 Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infraestrutura
 (câmeras, HUD, legendas sincronizadas, etiquetas, poeira, colapso, boneco de capacete).
 
+## Foco do canal (definido pelo Lucas em 24/11)
+- Absurdo e exagero que prende atenção: misturar comida exagerada, absurdo geral e, de vez em quando, engenharia.
+- Manter diversidade: nunca dois temas seguidos da mesma categoria (ver temas.md).
+- O exemplo do pilar mostra o ESTILO (estrutura, narração, legendas, colapso); o cenário 3D muda conforme o tema
+  (mesa com comida e boneco, cidade, planeta, etc.). Boneco mascote sempre presente.
+
 ## Formato (o que funcionou nas referências e foi aprovado pelo Lucas)
 - 60 a 90 s, vertical 1080x1920, 30 fps.
 - Gancho em pergunta "E se você ...?" com título grande na tela (palavra-chave amarela).
-- Estrutura: pergunta → explica o "esqueleto" (como a coisa funciona) → faz a coisa absurda →
-  consequência com números reais → piora (colapso/ruína visual quando fizer sentido) →
-  "do jeito certo" (solução de engenharia) → pergunta ao público ("comenta").
+- Estrutura: pergunta → explica como a coisa funciona → faz a coisa absurda → consequência com números
+  reais (para comida: 1 hora / 1 dia / 1 semana) → piora visual (colapso, explosão, inchaço...) →
+  virada/curiosidade final → pergunta ao público ("comenta qual exagero vem a seguir").
 - Boneco fixo: capacete amarelo, colete laranja, bigode (mascote do canal).
 - Legenda de 1 a 3 palavras, caixa alta, branca com contorno preto, palavra-chave em amarelo.
 - HUD no canto superior esquerdo (rótulo + número grande + subtítulo), etiquetas tipo pílula ✓/✗.
-- Aviso no fim: "Ilustração. Mexer em estrutura só com projeto de engenheiro." (ou equivalente ao tema).
+- Aviso no fim adequado ao tema: engenharia "Ilustração. Mexer em estrutura só com projeto de engenheiro.";
+  comida/bebida "Ilustração exagerada. Não tente isso."; absurdo físico: "Simulação hipotética".
 - Números: só valores de engenharia corretos ou ordens de grandeza marcadas com "~". Conferir na web.
 
 ## Narração (lições aprendidas — NÃO pular)
@@ -42,6 +49,6 @@ Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infr
 9. Conferir contact sheet (1 quadro a cada ~2,5 s) e a duração.
 10. Subir para `videos/epNN-slug.mp4` no repositório, adicionar o tema em `usados.md`.
 11. Buffer (organização "My organization", canal TikTok @to.scale8): criar o post como RASCUNHO
-    (saveToDraft: true), legenda com pergunta + hashtags (#engenharia #construcaocivil #obra #curiosidades),
+    (saveToDraft: true), legenda com pergunta + 4 a 6 hashtags do tema (#curiosidades #ese #exagero + específicas),
     metadata.tiktok.isAiGenerated = true, thumbnailOffset num quadro forte.
     NÃO publicar: o Lucas aprova cada post no app do Buffer (Add to Queue / horário 19:00).

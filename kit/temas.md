@@ -1,32 +1,36 @@
-# Temas (formato "E se...?" engenharia/casa/obra) — escolher em ordem, pular os que estão em usados.md
+# Fila de temas — formato "E se...?" (mistura: comida exagerada + absurdo geral + engenharia de vez em quando)
+# Regra do Lucas (24/11): manter DIVERSIDADE; nunca dois temas seguidos da mesma categoria.
+# Escolher o primeiro da lista que não esteja em usados.md. Pode adaptar o título para ficar mais forte.
+# Comida/bebida: quantidade ABSURDA (impossível de imitar), explicar o que acontece com o corpo em
+# 1 hora / 1 dia / 1 semana, e terminar com aviso "Não tente isso." Sem receita de desafio perigoso.
 
-1. E se você tirasse a viga de cima da porta? (verga e contraverga)
-2. E se a sua casa não tivesse fundação?
-3. E se você enchesse a laje com o dobro de concreto?
-4. E se você construísse um prédio de 10 andares em cima da areia da praia?
-5. E se a sua caixa d'água estourasse em cima da laje? (peso da água: 1.000 L = 1 t)
-6. E se você fizesse um furo enorme numa viga pra passar um cano?
-7. E se a sua casa não tivesse calha nem rufo? (infiltração)
-8. E se você tirasse o ferro (armadura) do concreto?
-9. E se você colocasse uma piscina no terraço do prédio?
-10. E se o seu telhado não tivesse inclinação nenhuma?
-11. E se a ponte não tivesse junta de dilatação?
-12. E se você construísse em cima de um aterro mal compactado? (recalque)
-13. E se o muro de arrimo não tivesse dreno?
-14. E se você misturasse água a mais no concreto?
-15. E se você tirasse a escora da laje antes da hora?
-16. E se um caminhão de 40 toneladas passasse numa ponte feita pra 10?
-17. E se a sua casa fosse construída sem nenhum pilar? (alvenaria estrutural)
-18. E se o prédio não balançasse com o vento? (rigidez x flexibilidade)
-19. E se a sua casa estivesse em cima de uma falha geológica? (terremoto)
-20. E se você empilhasse 100 andares em um terreno de 10 x 30?
-21. E se você construísse uma casa de tijolo sem argamassa?
-22. E se a sua rede de esgoto não tivesse caimento?
-23. E se você enterrasse o pilar direto no chão, sem sapata?
-24. E se uma árvore enorme crescesse do lado da sua casa? (raízes e fundação)
-25. E se você fizesse uma laje de 10 metros sem viga?
-26. E se o elevador do prédio caísse? (freio de segurança)
-27. E se você tirasse uma parede do apartamento? (parede estrutural x vedação)
-28. E se a represa rachasse?
-29. E se o asfalto não tivesse base nem sub-base?
-30. E se você construísse uma casa de 3 andares só com bloco de vidro?
+1. [comida] E se você comesse 15 kg de picanha num churrasco?
+2. [absurdo] E se todo mundo do Brasil pulasse ao mesmo tempo?
+3. [comida] E se você tomasse 50 litros de cerveja?
+4. [absurdo] E se a sua casa fosse feita de chocolate num dia de 40 °C?
+5. [engenharia] E se você tirasse uma parede do apartamento?
+6. [comida] E se você comesse 40 lanches do McDonald's de uma vez?
+7. [absurdo] E se você empilhasse 1 milhão de reais em notas de R$ 2?
+8. [comida] E se você tomasse 40 latas de energético?
+9. [absurdo] E se você enchesse o seu quarto de bexigas até o teto?
+10. [engenharia] E se a caixa d'água de 1.000 litros estourasse em cima da laje?
+11. [comida] E se você comesse 100 pimentas malaguetas?
+12. [absurdo] E se chovesse refrigerante por 1 hora na sua cidade?
+13. [comida] E se você comesse 5 kg de brigadeiro?
+14. [absurdo] E se você caísse num buraco que atravessasse a Terra?
+15. [engenharia] E se você colocasse uma piscina no terraço do prédio?
+16. [comida] E se você comesse 200 pães de queijo?
+17. [absurdo] E se a Lua estivesse na metade da distância?
+18. [comida] E se você tomasse 5 litros de café?
+19. [absurdo] E se você jogasse uma moeda do alto do Burj Khalifa?
+20. [engenharia] E se um caminhão de 40 t passasse numa ponte feita para 10?
+21. [comida] E se você comesse 3 kg de sal num dia?
+22. [absurdo] E se você tivesse 1 bilhão de formigas no quintal?
+23. [comida] E se você comesse 10 kg de açaí?
+24. [absurdo] E se todo o gelo da Antártida derretesse de uma vez?
+25. [engenharia] E se o elevador do prédio caísse?
+26. [comida] E se você comesse 50 ovos cozidos?
+27. [absurdo] E se você empilhasse todos os brasileiros um em cima do outro?
+28. [comida] E se você comesse 1 kg de noz-moscada?
+29. [absurdo] E se a gravidade sumisse por 5 segundos?
+30. [engenharia] E se você construísse um prédio de 10 andares na areia da praia?
