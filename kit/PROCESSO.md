@@ -63,9 +63,9 @@ Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infr
 10. Conferir contact sheet (1 quadro a cada ~2,5 s) e a duração.
 11. Subir para `videos/epNN-slug.mp4` no repositório, adicionar o tema em `usados.md`.
 12. Buffer (organização "My organization", canal TikTok @to.scale8): desde 25/11 o Lucas aprovou publicação
-    AUTOMÁTICA diária, desde 26/11 às 17:00 (Brasília; antes era 19:00). Criar o post agendado: mode "customScheduled", dueAt "AAAA-MM-DDT17:00:00-03:00",
+    AUTOMÁTICA diária às 19:00 (Brasília). Criar o post agendado: mode "customScheduled", dueAt "AAAA-MM-DDT19:00:00-03:00",
     saveToDraft false, legenda com pergunta + 4 a 6 hashtags do tema (#curiosidades #ese #exagero + específicas),
-    metadata.tiktok.isAiGenerated = true, thumbnailOffset num quadro forte. Se já passou das 17:00, "shareNow".
+    metadata.tiktok.isAiGenerated = true, thumbnailOffset num quadro forte. Se já passou das 19:00, "shareNow".
     Conferir com get_post que ficou "scheduled" sem erro. Se o vídeo não estiver bom, NÃO agendar e avisar o Lucas.
 
 ## Lições do ep05 (26/11)
