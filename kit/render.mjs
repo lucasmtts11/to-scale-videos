@@ -19,8 +19,8 @@ const grab = t => page.evaluate(t => { window.seek(t); return document.getElemen
   .then(d => Buffer.from(d.split(",")[1], "base64"));
 
 if (mode === "preview") {
-  mkdirSync("preview", { recursive: true });
-  for (const t of args.map(Number)) writeFileSync(`preview/t_${t.toFixed(2)}.jpg`, await grab(t));
+  const PD = process.env.PD || "preview"; mkdirSync(PD, { recursive: true });
+  for (const t of args.map(Number)) writeFileSync(`${PD}/t_${t.toFixed(2)}.jpg`, await grab(t));
 } else {
   const out = args[0] || "nova.mp4", tmp = out.replace(/\.mp4$/, ".tmp.mp4");
   const duration = await page.evaluate(() => window.DURATION);

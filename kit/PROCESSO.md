@@ -1,7 +1,9 @@
 # Processo de produção — @to.scale8 (formato "E se...?" em low-poly: comida exagerada, absurdo geral e engenharia de vez em quando)
 
-Referências prontas: `exemplo-ep03/` (engenharia, casa) e `exemplo-ep04/` (comida: mesa, pilha de
-picanha instanciada, barriga que incha, raio-x do estômago, convidados, etapas 1 hora/1 dia/1 semana).
+Referências prontas: `exemplo-ep03/` (engenharia, casa), `exemplo-ep04/` (comida: mesa, pilha de
+picanha instanciada, barriga que incha, raio-x do estômago, convidados, etapas 1 hora/1 dia/1 semana) e
+`exemplo-ep05/` (absurdo: multidão instanciada de ~3 mil bonecos + "tapete" texturizado para tomadas aéreas,
+segunda cena com planeta low-poly, contagem 3-2-1, pulo em câmera lenta, sismógrafo e engarrafamento no HUD).
 Referência original: `exemplo-ep03/` (vídeo publicado: videos/ep03-tirar-um-pilar-v2.mp4).
 Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infraestrutura
 (câmeras, HUD, legendas sincronizadas, etiquetas, poeira, colapso, boneco de capacete).
@@ -65,3 +67,21 @@ Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infr
     saveToDraft false, legenda com pergunta + 4 a 6 hashtags do tema (#curiosidades #ese #exagero + específicas),
     metadata.tiktok.isAiGenerated = true, thumbnailOffset num quadro forte. Se já passou das 19:00, "shareNow".
     Conferir com get_post que ficou "scheduled" sem erro. Se o vídeo não estiver bom, NÃO agendar e avisar o Lucas.
+
+## Lições do ep05 (26/11)
+- INSTALAÇÃO: o `pip install chatterbox-tts` baixa o torch completo com CUDA (~3 GB, ~20 min a 4 MB/s; o
+  download.pytorch.org é bloqueado pelo proxy). Disparar o pip em segundo plano no PRIMEIRO minuto e escrever
+  roteiro/cena enquanto baixa. `npm install three` pode rodar em paralelo, separado.
+- Máquina com 2 CPUs: render a ~1,3 quadro/s por processo; 3 partes em paralelo fazem 90 s de vídeo em ~10 min.
+- InstancedMesh com instâncias longe da origem SOME (frustum culling usa a geometria original):
+  sempre `mesh.frustumCulled = false` em multidões, carros, pilhas etc.
+- Tomadas aéreas (câmera a 200-300 m) com `camera.near = 0.05` dão z-fighting entre planos próximos
+  (chão x tapete): usar near 0,5 ou mais.
+- Aceitar similaridade 0,86 deixou passar palavra errada ("pessoas" saiu "péssulas"). Se o log mostrar palavra
+  estranha, regenerar o trecho com limite mais alto (cópia do tts.py com `sim >= 0.97`).
+- O valor-chave revelado na última palavra do trecho (ex.: "próton", "átomo") ficava <1 s na tela: dar EXTRA
+  de 1,3-1,4 s nesses trechos no build_timeline.py.
+- `rm preview/*` é bloqueado pela checagem de segurança: o render.mjs agora aceita `PD=pasta` para gravar
+  as prévias numa pasta nova a cada rodada.
+- Render sai com ~20 Mbps (crf 18); ao juntar com o áudio, reencodar com `-crf 23 -maxrate 5M -bufsize 10M`
+  (90 s ≈ 33 MB) para ficar bem abaixo do limite de 100 MB do GitHub.
