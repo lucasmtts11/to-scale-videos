@@ -30,7 +30,7 @@ checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de es
 
 ## Narração (lições aprendidas — NÃO pular)
 - Voz: Chatterbox Multilingual, language_id="pt", exaggeration=0.8, cfg_weight=0.3, com a voz de referência
-  `kit/voz_referencia.wav` (desde 26/11 o tts.py carrega sozinho; ep01 a ep05 saíram SEM ela, por isso o timbre variava).
+  `kit/voz_referencia.wav` (desde 26/11 o tts.py carrega sozinho; ep01 a ep05 saíram SEM ela, com o timbre padrão do modelo).
   Copiar o tts.py e o voz_referencia.wav juntos para a pasta do episódio.
 - Escrever o roteiro em frases CURTAS separadas por " | " no roteiro.json. O tts.py gera frase por
   frase, testa até 4 variações, escolhe a mais fiel (whisper) e coloca pausas reais:
