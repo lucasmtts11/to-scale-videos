@@ -17,7 +17,7 @@ narração "sem pausa nenhuma" das referências).
 - Mostrar o que dá errado ANTES da explicação/solução (@desmontandoomundo: chuva e deslizamento antes da drenagem).
 - Escolha com número e contador deixa o vídeo legível para quem chega no meio (@vidadabia: HUD fixo "R$ 1.410 / R$ 1.500"; @itsshukee: "33/100").
 - Cartão de dado com FONTE quando o número vem de órgão oficial ("ESTIMATIVA IBGE 2025", "TACO"): dá credibilidade (@animaet).
-- Fecho com pergunta direta que vira pauta: "Qual exagero vem a seguir? Comenta". Quando um tema vier dos comentários,
+- Fecho com pergunta direta que vira pauta: "Qual a próxima experiência? Comenta aqui embaixo." (frase do Lucas, 27/11). Quando um tema vier dos comentários,
   abrir o episódio com "Vocês pediram: ..." (@vidadabia, @animaet).
 - De vez em quando, gancho de PARTE 2 no fim ("e se fossem 100?"), que faz seguir o perfil (@itsshukee). Só quando
   a parte 2 for realmente produzida no dia seguinte.

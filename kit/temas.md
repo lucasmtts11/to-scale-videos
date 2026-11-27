@@ -2,7 +2,8 @@
 # Regra do Lucas (24/11): manter DIVERSIDADE; nunca dois temas seguidos da mesma categoria.
 # Escolher o primeiro da lista que não esteja em usados.md. Pode adaptar o título para ficar mais forte.
 # Comida/bebida: quantidade ABSURDA (impossível de imitar), explicar o que acontece com o corpo em
-# 1 hora / 1 dia / 1 semana, e terminar com aviso "Não tente isso." Sem receita de desafio perigoso.
+# o corpo numa linha do tempo com marcos que fazem sentido para o caso (minutos, horas, dias no hospital,
+# semanas...; não precisa ser 1 hora / 1 dia / 1 semana), e terminar com aviso "Não tente isso." Sem receita de desafio perigoso.
 
 1. [comida] E se você comesse 15 kg de picanha num churrasco?
 2. [absurdo] E se todo mundo do Brasil pulasse ao mesmo tempo?

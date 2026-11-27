@@ -19,8 +19,14 @@ checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de es
 - 60 a 90 s, vertical 1080x1920, 30 fps.
 - Gancho em pergunta "E se você ...?" com título grande na tela (palavra-chave amarela).
 - Estrutura: pergunta → explica como a coisa funciona → faz a coisa absurda → consequência com números
-  reais (para comida: 1 hora / 1 dia / 1 semana) → piora visual (colapso, explosão, inchaço...) →
-  virada/curiosidade final → pergunta ao público ("comenta qual exagero vem a seguir").
+  reais (para comida: linha do tempo do corpo, ver abaixo) → piora visual (colapso, explosão, inchaço...) →
+  virada/curiosidade final → pergunta ao público: "Qual a próxima experiência? Comenta aqui embaixo."
+  (pedido do Lucas em 27/11: NÃO usar mais "qual exagero/absurdo vem a seguir").
+- Linha do tempo (pedido do Lucas em 27/11): as escalas de tempo seguem a situação, não um molde fixo de
+  1 hora / 1 dia / 1 semana. Mostrar o que é realista e dramático: ex. 50 L de cerveja de uma vez → em minutos o
+  estômago não aguenta, em ~1 hora a pessoa já está muito mal e vai para o hospital; depois contar os próximos
+  dias no hospital e as mudanças no corpo (fígado, rins, cérebro), e só falar de semanas se fizer sentido.
+  Escolher 3 ou 4 marcos (minutos, horas, dias, semanas, meses) que contem a história de forma crível.
 - Boneco fixo: capacete amarelo, colete laranja, bigode (mascote do canal).
 - Legenda de 1 a 3 palavras, caixa alta, branca com contorno preto, palavra-chave em amarelo.
 - HUD no canto superior esquerdo (rótulo + número grande + subtítulo), etiquetas tipo pílula ✓/✗.
