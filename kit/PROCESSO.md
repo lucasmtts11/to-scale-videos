@@ -88,3 +88,6 @@ checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de es
   as prévias numa pasta nova a cada rodada.
 - Render sai com ~20 Mbps (crf 18); ao juntar com o áudio, reencodar com `-crf 23 -maxrate 5M -bufsize 10M`
   (90 s ≈ 33 MB) para ficar bem abaixo do limite de 100 MB do GitHub.
+- NÃO abrir o Chrome (prévia/render) enquanto o TTS roda: os dois juntos passam dos ~8 GB e o kernel mata o
+  tts.py sem mensagem de erro no log (só some o voz_<trecho>.wav). Conferir com `ls voz_*.wav` antes do build_timeline.
+- Medir o ritmo do vídeo pronto com `python3 kit/medir_cortes.py video.mp4` e comparar com a tabela de ESTUDOS.md.

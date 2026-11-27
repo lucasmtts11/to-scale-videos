@@ -58,11 +58,31 @@ narração "sem pausa nenhuma" das referências).
 - Fechamento semanal (findings.md): para cada vídeo, base, desempenho contra a média e uma mudança; vira regra
   depois de 3 repetições.
 
+## Medições nos vídeos (26/11) — referências x nossos episódios
+Medido com diferença de quadros (fps 30, 72x128): troca de tomada = pico de diferença; "parado" = quadro quase igual ao anterior.
+
+| vídeo | tomada média | maior tomada | quadros parados | movimento mediano |
+|---|---|---|---|---|
+| @animaet (Ilhas Faroé, 125 s) | 1,7 s | 4,8 s | 11% | 1,6 |
+| @dwxzmusic (casa impossível, 141 s) | 3,0 s | 6,0 s | 7% | 1,3 |
+| @itsshukee (100 gênios, 45 s) | 3,8 s | 6,7 s | 24% | 0,5 |
+| @mildly.elsewhere (dique seco, 70 s) | câmera sempre em movimento (corte não detectável) | — | 21% | 4,5 |
+| **nosso ep04 (picanha)** | **6,4 s** | **11,6 s** | **58%** | **0,2** |
+| **nosso ep05 v1 (Brasil pulando)** | **7,8 s** | **18,1 s** | **43%** | **0,4** |
+
+Conclusões:
+- Nossas tomadas duram o dobro ou o triplo das referências e metade dos quadros fica praticamente parada.
+  Regra: tomada média de 2,5 a 4 s, nenhuma acima de 5 s; câmera com deslocamento visível em toda tomada
+  (no kit: função `cam()` do exemplo-ep05 v2, que corta no início de cada frase e divide trechos longos).
+- Pausas na fala: @dwxzmusic tem ~9 pausas por minuto (média 0,43 s), parecido com as nossas (~8/min, 0,55 s).
+  @animaet e @mildly quase não pausam. As pausas que o Lucas pediu estão dentro do que funciona.
+- Primeiro corte: as referências cortam entre 3 e 7 s; o ep05 v1 só cortava aos 18 s.
+
 ## Checklist rápido (marcar no fim de cada episódio)
 - [ ] Movimento nos quadros 0 a 3 e pergunta na tela
 - [ ] Algo dá errado antes da explicação
 - [ ] Pelo menos um contador ou cartão de dado (com fonte quando houver)
-- [ ] Tomadas de 2 a 5 s, corte seco no começo da frase
+- [ ] Tomadas de 2 a 5 s (média 2,5 a 4 s), corte seco no começo da frase; medir com kit/medir_cortes.py
 - [ ] Movimentos com ease-out, mola nos objetos que chegam, elementos escalonados
 - [ ] Voz de referência carregada (log do tts.py mostra "voz de referência: ...wav")
 - [ ] Valor-chave ≥ 1,5 s na tela; nada cortado ou sobreposto no contact sheet
