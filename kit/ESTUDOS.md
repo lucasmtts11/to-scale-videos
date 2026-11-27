@@ -69,6 +69,7 @@ Medido com diferença de quadros (fps 30, 72x128): troca de tomada = pico de dif
 | @mildly.elsewhere (dique seco, 70 s) | câmera sempre em movimento (corte não detectável) | — | 21% | 4,5 |
 | **nosso ep04 (picanha)** | **6,4 s** | **11,6 s** | **58%** | **0,2** |
 | **nosso ep05 v1 (Brasil pulando)** | **7,8 s** | **18,1 s** | **43%** | **0,4** |
+| **nosso ep05 v2 (refeito com as regras)** | **3,8 s** | **11,6 s** | **19%** | **0,8** |
 
 Conclusões:
 - Nossas tomadas duram o dobro ou o triplo das referências e metade dos quadros fica praticamente parada.
