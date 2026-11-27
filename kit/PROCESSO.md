@@ -46,7 +46,7 @@ checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de es
 - Duração mínima do vídeo: 60 s. Se ficar curto, aumentar EXTRA (pausas dramáticas) no build_timeline.py.
 
 ## Passo a passo (em /home/claude/ep, com EP=/home/claude/ep)
-1. `pip install --break-system-packages chatterbox-tts faster-whisper soundfile` (torch já vem);
+1. `pip install --break-system-packages chatterbox-tts faster-whisper soundfile num2words` (torch vem junto, ~3 GB);
    three.js: `npm install three@0.170.0`; Playwright fica em /opt/npm-tools e o Chrome em /usr/bin/google-chrome.
 2. Escolher o próximo tema de `temas.md` que não esteja em `usados.md`. Pesquisar os números.
    ANTES de escolher: `git pull` e conferir `usados.md` E os posts recentes no Buffer (list_posts). Em 25/11 duas
@@ -91,7 +91,14 @@ checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de es
 - NÃO abrir o Chrome (prévia/render) enquanto o TTS roda: os dois juntos passam dos ~8 GB e o kernel mata o
   tts.py sem mensagem de erro no log (só some o voz_<trecho>.wav). Conferir com `ls voz_*.wav` antes do build_timeline.
 - Medir o ritmo do vídeo pronto com `python3 kit/medir_cortes.py video.mp4` e comparar com a tabela de ESTUDOS.md.
-- BUG ACHADO no ep05 v2 (26/11, a revisar): o tts.py corta cada frase depois da N-ésima palavra do whisper (N = palavras
-  do roteiro). Palavra com hífen ("porta-aviões") vira 2 palavras no whisper, então a frase era cortada antes do fim
-  ("mais pesado que cem porta-" e silêncio). Corrigido: o roteiro agora é contado separando hífens. O Lucas também
-  ouviu "travadas" no áudio do ep05 v2: OUVIR/medir cada voz_<trecho>.wav (palavras cortadas no fim de frase) antes de montar.
+- CAUSA DAS "TRAVADAS" do ep05 (v1 e v2, achada em 27/11): o tts.py cortava cada frase no fim de palavra estimado pelo
+  whisper (+0,22 s) e escolhia essa palavra CONTANDO palavras. Três falhas juntas comiam o fim das frases:
+  (1) palavra com hífen vira 2 no whisper ("porta-aviões" → cortava em "porta-");
+  (2) o whisper escreve "pro" como "para o" ou inventa um "E" no começo → a contagem chegava antes ("pro lado" sem
+  "contrário", "o país" sem "inteiro");
+  (3) o fim estimado pelo whisper vem cedo e comia a última sílaba.
+  Corrigido no tts.py: procura de trás para frente a ÚLTIMA palavra do roteiro, corta no fim real do som (envelope,
+  até começar a palavra seguinte) e compara também os números (num2words: "213" → "duzentos e treze"; antes "treze"
+  saía "três" e passava). Instalar: `pip install --break-system-packages num2words`.
+  CONFERÊNCIA obrigatória depois do TTS: transcrever cada v_<trecho>.wav e comparar com o roteiro (script analisa.py do
+  exemplo-ep05); qualquer palavra faltando no fim de frase = regenerar o trecho.

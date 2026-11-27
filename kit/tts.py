@@ -23,8 +23,28 @@ def pause_after(s):
     if s.endswith("."): return 0.5
     return 0.3
 SYN = {"pras": "para", "pros": "para", "pra": "para", "lage": "laje", "bigas": "vigas", "biga": "viga"}
+from num2words import num2words
 def n(w):
     w = re.sub(r"[^a-zà-ú0-9]", "", w.lower()); return SYN.get(w, w)
+def words(txt):
+    # o whisper escreve números em dígitos ("213", "60 kg"): converte para extenso para comparar TUDO,
+    # inclusive os números (no ep05 v2 "treze" saiu "três" e passou porque números eram ignorados)
+    out = []
+    for x in txt.replace("-", " ").replace("kg", " quilos").split():
+        x = n(x)
+        if not x: continue
+        if x.isdigit(): out += [n(y) for y in num2words(int(x), lang="pt_BR").replace("-", " ").split()]
+        else: out.append(x)
+    return out
+def fim_da_fala(w, t_end, t_next=None):
+    # corta no fim REAL do som (envelope), não no fim estimado pelo whisper, que costuma vir cedo e comia
+    # a última sílaba ("contrá-", "porta-", "país in-") — eram as "travadas" do ep05 v2
+    env = np.sqrt(np.convolve(w ** 2, np.ones(int(0.02 * SR)) / int(0.02 * SR), "same"))
+    thr = max(0.01, 0.06 * env.max()); i = int(t_end * SR); quiet = int(0.18 * SR); lim = min(len(w), i + int(0.9 * SR), int((t_next - 0.04) * SR) if t_next else len(w))
+    while i < lim:
+        if (env[i:i + quiet] < thr).all(): return i + int(0.06 * SR)
+        i += int(0.01 * SR)
+    return lim
 def gen(text, seed):
     torch.manual_seed(seed)
     w = m.generate(text, language_id="pt", audio_prompt_path=REF, exaggeration=0.8, cfg_weight=0.3).squeeze().numpy()
@@ -35,17 +55,22 @@ for s in segs:
     parts = [p.strip() for p in s["text"].split("|") if p.strip()]
     out = []
     for i, p in enumerate(parts):
-        best = None; want = [n(x) for x in p.replace("-", " ").split() if n(x)]  # "porta-aviões" = 2 palavras no whisper
+        best = None; want = words(p)
         for seed in (7, 19, 31, 43):
-            w, ws = gen(p, seed); got = [n(x.word) for x in ws if n(x.word)]
-            # números viram dígitos no whisper: compara sem eles
-            sim = difflib.SequenceMatcher(None, [x for x in want if not x.isdigit()], [x for x in got if not x.isdigit()]).ratio()
+            w, ws = gen(p, seed); got = words(" ".join(x.word for x in ws))
+            sim = difflib.SequenceMatcher(None, want, got).ratio()
             if best is None or sim > best[0]: best = (sim, w, ws)
             if sim >= 0.85: break
         sim, w, ws = best
         if ws:
-            last = min(len(ws), len(want)) - 1   # ignora palavra extra inventada no fim
-            a0 = max(0, int((ws[0].start - 0.08) * SR)); a1 = min(len(w), int((ws[last].end + 0.22) * SR)); w = w[a0:a1]
+            # última palavra do roteiro no que o whisper ouviu (ignora palavra extra inventada no fim)
+            # (busca de trás para frente a ÚLTIMA palavra do roteiro; contar palavras falha quando o whisper
+            #  escreve "pro" como "para o" ou inventa um "E" no começo: cortava "contrário" e "inteiro")
+            k = len(ws) - 1
+            for j in range(len(ws) - 1, -1, -1):
+                if want and want[-1] in words(ws[j].word): k = j; break
+                if want and difflib.SequenceMatcher(None, want[-1], "".join(words(ws[j].word))).ratio() > 0.75: k = j; break
+            a0 = max(0, int((ws[0].start - 0.08) * SR)); a1 = fim_da_fala(w, ws[k].end, ws[k + 1].start if k + 1 < len(ws) else None); w = w[a0:a1]
         fade = min(len(w), int(0.04 * SR)); w[-fade:] *= np.linspace(1, 0, fade)
         out.append(w); out.append(np.zeros(int(pause_after(p) * SR), np.float32) if i < len(parts) - 1 else np.zeros(0, np.float32))
         print(s["id"], i, round(sim, 2), repr(p), "->", " ".join(x.word.strip() for x in ws), flush=True)
