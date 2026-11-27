@@ -35,7 +35,7 @@ for s in segs:
     parts = [p.strip() for p in s["text"].split("|") if p.strip()]
     out = []
     for i, p in enumerate(parts):
-        best = None; want = [n(x) for x in p.split() if n(x)]
+        best = None; want = [n(x) for x in p.replace("-", " ").split() if n(x)]  # "porta-aviões" = 2 palavras no whisper
         for seed in (7, 19, 31, 43):
             w, ws = gen(p, seed); got = [n(x.word) for x in ws if n(x.word)]
             # números viram dígitos no whisper: compara sem eles

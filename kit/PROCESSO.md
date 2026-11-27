@@ -91,3 +91,7 @@ checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de es
 - NÃO abrir o Chrome (prévia/render) enquanto o TTS roda: os dois juntos passam dos ~8 GB e o kernel mata o
   tts.py sem mensagem de erro no log (só some o voz_<trecho>.wav). Conferir com `ls voz_*.wav` antes do build_timeline.
 - Medir o ritmo do vídeo pronto com `python3 kit/medir_cortes.py video.mp4` e comparar com a tabela de ESTUDOS.md.
+- BUG ACHADO no ep05 v2 (26/11, a revisar): o tts.py corta cada frase depois da N-ésima palavra do whisper (N = palavras
+  do roteiro). Palavra com hífen ("porta-aviões") vira 2 palavras no whisper, então a frase era cortada antes do fim
+  ("mais pesado que cem porta-" e silêncio). Corrigido: o roteiro agora é contado separando hífens. O Lucas também
+  ouviu "travadas" no áudio do ep05 v2: OUVIR/medir cada voz_<trecho>.wav (palavras cortadas no fim de frase) antes de montar.
