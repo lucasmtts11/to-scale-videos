@@ -12,6 +12,9 @@ if ONLY: segs = [x for x in segs if x["id"] in ONLY]
 m = ChatterboxMultilingualTTS.from_pretrained(device="cpu")
 wm = WhisperModel("small", device="cpu", compute_type="int8", download_root=os.path.join(os.path.expanduser("~"), ".modelos", "whisper"))
 SR = m.sr
+# voz de referência do canal (VOZ.md): mantém o MESMO timbre em todos os episódios
+REF = next((p for p in [os.environ.get("VOZ_REF", ""), os.path.join(os.path.dirname(os.path.abspath(__file__)), "voz_referencia.wav"), f"{D}/voz_referencia.wav"] if p and os.path.exists(p)), None)
+print("voz de referência:", REF, flush=True)
 def pause_after(s):
     s = s.strip()
     if s.endswith("?"): return 0.75
@@ -24,7 +27,7 @@ def n(w):
     w = re.sub(r"[^a-zà-ú0-9]", "", w.lower()); return SYN.get(w, w)
 def gen(text, seed):
     torch.manual_seed(seed)
-    w = m.generate(text, language_id="pt", exaggeration=0.8, cfg_weight=0.3).squeeze().numpy()
+    w = m.generate(text, language_id="pt", audio_prompt_path=REF, exaggeration=0.8, cfg_weight=0.3).squeeze().numpy()
     a16 = w[np.linspace(0, len(w) - 1, int(len(w) * 16000 / SR)).astype(int)].astype(np.float32)
     r, _ = wm.transcribe(a16, language="pt", word_timestamps=True); ws = [x for s in r for x in s.words]
     return w, ws

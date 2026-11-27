@@ -5,7 +5,8 @@ picanha instanciada, barriga que incha, raio-x do estômago, convidados, etapas 
 `exemplo-ep05/` (absurdo: multidão instanciada de ~3 mil bonecos + "tapete" texturizado para tomadas aéreas,
 segunda cena com planeta low-poly, contagem 3-2-1, pulo em câmera lenta, sismógrafo e engarrafamento no HUD).
 Referência original: `exemplo-ep03/` (vídeo publicado: videos/ep03-tirar-um-pilar-v2.mp4).
-Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infraestrutura
+ANTES de roteirizar, leia `ESTUDOS.md` (regras tiradas dos vídeos de referência e dos artigos) e marque o
+checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infraestrutura
 (câmeras, HUD, legendas sincronizadas, etiquetas, poeira, colapso, boneco de capacete).
 
 ## Foco do canal (definido pelo Lucas em 24/11)
@@ -28,7 +29,9 @@ Leia o `pilar.html` inteiro antes de escrever uma cena nova: ele tem toda a infr
 - Números: só valores de engenharia corretos ou ordens de grandeza marcadas com "~". Conferir na web.
 
 ## Narração (lições aprendidas — NÃO pular)
-- Voz: Chatterbox Multilingual, language_id="pt", exaggeration=0.8, cfg_weight=0.3.
+- Voz: Chatterbox Multilingual, language_id="pt", exaggeration=0.8, cfg_weight=0.3, com a voz de referência
+  `kit/voz_referencia.wav` (desde 26/11 o tts.py carrega sozinho; ep01 a ep05 saíram SEM ela, por isso o timbre variava).
+  Copiar o tts.py e o voz_referencia.wav juntos para a pasta do episódio.
 - Escrever o roteiro em frases CURTAS separadas por " | " no roteiro.json. O tts.py gera frase por
   frase, testa até 4 variações, escolhe a mais fiel (whisper) e coloca pausas reais:
   0,75 s depois de "?", 0,65 s depois de "...", 0,5 s depois de ".", e deixa 6% mais lento.
