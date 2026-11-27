@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000}canvas{display:block}#gl{position:absolute;left:-9999px}</style>
+</head><body>
+<canvas id="out" width="1080" height="1920"></canvas>
+<script src="timeline.js"></script>
+<script type="module">
+import * as THREE from "./node_modules/three/build/three.module.js";
+const W = 1080, H = 1920;
+const TL = window.TL;
+const DURATION = TL.total;
+const SEG = Object.fromEntries(TL.segs.map(s => [s.id, s]));
+
+// ================= utilitários =================
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = x => 1 - Math.pow(1 - clamp(x), 3);
+const easeIn = x => Math.pow(clamp(x), 2);
+const easeInOut = x => { x = clamp(x); return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2; };
+function spring(t, f = 1.6, z = 0.6) { if (t <= 0) return 0; const w = 2*Math.PI*f, wd = w*Math.sqrt(1-z*z); return 1 - Math.exp(-z*w*t)*(Math.cos(wd*t) + (z*w/wd)*Math.sin(wd*t)); }
+const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+function wordTime(seg, w, nth = 0) {
+  const list = TL.words.filter(x => x.seg === seg && x.w.toLowerCase().replace(/[^a-zà-ú0-9]/g, "").startsWith(w));
+  return list.length ? list[Math.min(nth, list.length - 1)].s : null;
+}
+
+// ================= renderer / cena =================
+const glCanvas = document.createElement("canvas"); glCanvas.id = "gl"; document.body.appendChild(glCanvas);
+const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x3A2A22);
+const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 200);
+scene.add(new THREE.HemisphereLight(0xFFF1DC, 0x6B4A34, 1.4));
+const sun = new THREE.DirectionalLight(0xFFE2B8, 2.3);
+sun.position.set(5, 9, 7); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 30 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+scene.add(sun);
+const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...extra });
+const box = (w, h, d, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.castShadow = m.receiveShadow = true; return m; };
+const cyl = (rt, rb, h, seg, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat); m.castShadow = m.receiveShadow = true; return m; };
+function textTex(lines, w = 512, h = 256, bg = "#fff", fg = "#222", size = 70) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
+  g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.textAlign = "center"; g.textBaseline = "middle"; g.font = `900 ${size}px Inter, sans-serif`;
+  lines.forEach((l, i) => g.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * size * 1.1));
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+// ---- bar: piso de tábuas, parede, placa, balcão, banquetas
+{
+  const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
+  for (let i = 0; i < 8; i++) { g.fillStyle = ["#8A5A36", "#7E5232", "#94633C", "#835634"][i % 4]; g.fillRect(0, i * 32, 256, 31); g.fillStyle = "#5A3820"; g.fillRect(0, i * 32 + 31, 256, 1); g.fillRect((i * 97) % 256, i * 32, 2, 32); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(8, 8); t.colorSpace = THREE.SRGBColorSpace;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+}
+const wall = box(40, 6, 0.2, M(0xE9D9B8)); wall.position.set(0, 3, -4.2); scene.add(wall);
+const wallLow = box(40, 1.2, 0.22, M(0x2F6B4F)); wallLow.position.set(0, 0.6, -4.1); scene.add(wallLow);
+const sideWall = box(0.2, 6, 30, M(0xE3D1AE)); sideWall.position.set(-6.5, 3, 8); scene.add(sideWall);
+{ const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.0), new THREE.MeshStandardMaterial({ map: textTex(["BAR DO EXAGERO"], 1024, 300, "#B8322A", "#FFE9A8", 120), roughness: 0.7, emissive: 0x331010 }));
+  sign.position.set(-0.6, 3.6, -4.08); scene.add(sign); }
+// balcão ao fundo + garrafas
+{ const bal = box(5, 1.1, 0.7, M(0x6A4026)); bal.position.set(1.2, 0.55, -3.3); scene.add(bal);
+  const top = box(5.1, 0.08, 0.8, M(0x4A2C1A)); top.position.set(1.2, 1.14, -3.3); scene.add(top);
+  const shelf = box(4, 0.06, 0.3, M(0x4A2C1A)); shelf.position.set(1.2, 2.3, -3.95); scene.add(shelf);
+  for (let i = 0; i < 14; i++) { const b = cyl(0.05, 0.06, 0.32, 6, M([0x2E7D4F, 0x7A4A1A, 0x3D6FB0, 0xC9A23A][i % 4])); b.position.set(-0.4 + i * 0.24, 2.49, -3.95); scene.add(b); }
+  // luminárias
+  for (const x of [-2.5, 0, 2.5]) { const w = cyl(0.01, 0.01, 1.2, 4, M(0x222222)); w.position.set(x, 5.4, -0.5); scene.add(w); const sh = cyl(0.12, 0.35, 0.3, 10, M(0x2F6B4F)); sh.position.set(x, 4.7, -0.5); scene.add(sh); const lb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xFFE7A0 })); lb.position.set(x, 4.55, -0.5); scene.add(lb); }
+}
+// mesa com a pirâmide de latas (à esquerda do boneco)
+const TABLE_X = -1.55, TABLE_Z = 0.2, TABLE_Y = 0.78;
+const table = new THREE.Group(); scene.add(table);
+{ const top = box(1.5, 0.08, 1.1, M(0x9A6A40)); top.position.y = TABLE_Y - 0.04; table.add(top);
+  for (const [x, z] of [[-0.65, -0.45], [0.65, -0.45], [-0.65, 0.45], [0.65, 0.45]]) { const l = box(0.08, TABLE_Y - 0.08, 0.08, M(0x6A4026)); l.position.set(x, (TABLE_Y - 0.08) / 2, z); table.add(l); } }
+table.position.set(TABLE_X, 0, TABLE_Z);
+
+// ================= latas instanciadas (pirâmide 7² + 6² + ... + 1² = 140, + 3 no topo = 143) =================
+const CR = 0.055, CH = 0.19;
+function canGeo(body, band, topc) {
+  const parts = [[new THREE.CylinderGeometry(CR, CR, CH * 0.78, 10), body, [0, 0, 0]], [new THREE.CylinderGeometry(CR * 1.01, CR * 1.01, CH * 0.12, 10), band, [0, 0.01, 0]], [new THREE.CylinderGeometry(CR * 0.85, CR, CH * 0.11, 10), topc, [0, CH * 0.445, 0]], [new THREE.CylinderGeometry(CR, CR * 0.85, CH * 0.11, 10), topc, [0, -CH * 0.445, 0]]];
+  const pos = [], nor = [], col = [];
+  for (const [g0, c, o] of parts) { const g = g0.toNonIndexed(); g.translate(...o); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); for (let i = 0; i < g.attributes.position.count; i++) col.push(...c); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); return g;
+}
+const NCAN = 143;
+const cans = new THREE.InstancedMesh(canGeo([0.95, 0.72, 0.12], [0.85, 0.15, 0.12], [0.82, 0.84, 0.86]), M(0xFFFFFF, { vertexColors: true, roughness: 0.45, metalness: 0.3 }), NCAN);
+const waters = new THREE.InstancedMesh(canGeo([0.55, 0.8, 1.0], [0.15, 0.45, 0.9], [0.9, 0.95, 1.0]), M(0xFFFFFF, { vertexColors: true, roughness: 0.3, transparent: true, opacity: 0.92 }), NCAN);
+cans.castShadow = waters.castShadow = true; cans.frustumCulled = waters.frustumCulled = false; scene.add(cans, waters);
+const SLOTS = [];
+{ const sp = 0.118; let L = 0;
+  for (let n = 7; n >= 1; n--, L++) for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) SLOTS.push([(i - (n - 1) / 2) * sp, L * CH + CH / 2, (j - (n - 1) / 2) * sp]);
+  for (let k = 0; k < 3; k++) SLOTS.push([(k - 1) * 0.12, 7 * CH + CH / 2, 0.0]);
+}
+// t0: chegada (cai do alto com mola, escalonado por camada); gone: quantas latas (do topo) já foram bebidas
+function drawCans(mesh, t, t0, gone = 0, wob = 0) {
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), e = new THREE.Euler();
+  for (let i = 0; i < NCAN; i++) {
+    const p = SLOTS[i];
+    if (t0 == null || i >= NCAN - gone) { m.makeScale(0, 0, 0); mesh.setMatrixAt(i, m); continue; }
+    const d = (i / NCAN) * 0.9;
+    const k = spring(t - t0 - d, 1.7, 0.55);
+    if (t - t0 - d <= 0) { m.makeScale(0, 0, 0); mesh.setMatrixAt(i, m); continue; }
+    e.set(wob * Math.sin(t * 9 + i) * 0.05, hash(i) * 6, wob * Math.cos(t * 8 + i) * 0.05); q.setFromEuler(e);
+    v.set(TABLE_X + p[0], TABLE_Y + p[1] + 1.6 * (1 - k), TABLE_Z + p[2]); m.compose(v, q, s); mesh.setMatrixAt(i, m);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
+// ================= boneco (capacete + colete + bigode + barriga + lata na mão) =================
+const SKIN = 0xE3B08C;
+const guyMats = [];
+const GM = (c, e = {}) => { const m = M(c, { transparent: true, ...e }); guyMats.push(m); return m; };
+function person() {
+  const g = new THREE.Group(), P = {};
+  const body = new THREE.Group(); g.add(body); P.body = body;
+  for (const sx of [-1, 1]) { const leg = box(0.17, 0.86, 0.2, GM(0x2F3A56)); leg.position.set(sx * 0.11, 0.43, 0); g.add(leg); const sh = box(0.19, 0.1, 0.28, GM(0x3B2A20)); sh.position.set(sx * 0.11, 0.05, 0.04); g.add(sh); }
+  const torso = box(0.5, 0.66, 0.28, GM(0x3D7CC9)); torso.position.y = 1.19; body.add(torso);
+  const vest = box(0.52, 0.5, 0.3, GM(0xFF8A1E)); vest.position.y = 1.2; body.add(vest);
+  const stripe = box(0.53, 0.05, 0.31, GM(0xF4F4F4)); stripe.position.y = 1.12; body.add(stripe);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), GM(0x3D7CC9)); belly.castShadow = true; belly.position.set(0, 1.08, 0.06); belly.scale.set(1, 1, 0.55); body.add(belly); P.belly = belly;
+  for (const sx of [-1, 1]) {
+    const piv = new THREE.Group(); piv.position.set(sx * 0.32, 1.47, 0);
+    const arm = box(0.13, 0.62, 0.15, GM(0x3D7CC9)); arm.position.y = -0.31; piv.add(arm);
+    const hand = box(0.12, 0.12, 0.13, GM(SKIN)); hand.position.y = -0.66; piv.add(hand);
+    g.add(piv); P[sx < 0 ? "armL" : "armR"] = piv;
+  }
+  const head = new THREE.Group(); head.position.y = 1.68; g.add(head); P.head = head;
+  const skinMat = GM(SKIN); P.skinMat = skinMat;
+  const hd = new THREE.Mesh(new THREE.SphereGeometry(0.155, 14, 10), skinMat); hd.scale.set(1, 1.15, 1); hd.castShadow = true; head.add(hd);
+  for (const sx of [-1, 1]) { const e = box(0.035, 0.04, 0.02, GM(0x111111)); e.position.set(sx * 0.055, 0.03, 0.15); head.add(e); P[sx < 0 ? "eyeL" : "eyeR"] = e; }
+  const mouth = box(0.07, 0.02, 0.02, GM(0x7A2E2E)); mouth.position.set(0, -0.06, 0.15); head.add(mouth); P.mouth = mouth;
+  const mus = box(0.14, 0.03, 0.03, GM(0x3A2618)); mus.position.set(0, -0.025, 0.155); head.add(mus);
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.175, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), GM(0xFFD21F)); helmet.position.y = 0.05; head.add(helmet);
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.025, 16), GM(0xFFD21F)); brim.position.set(0, 0.05, 0.03); head.add(brim);
+  // lata na mão direita
+  const can = new THREE.Mesh(canGeo([0.95, 0.72, 0.12], [0.85, 0.15, 0.12], [0.82, 0.84, 0.86]), GM(0xFFFFFF, { vertexColors: true, roughness: 0.45 }));
+  can.position.set(0, -0.72, 0.06); P.armR.add(can); P.can = can;
+  g.userData.P = P; return g;
+}
+const guy = person(); guy.scale.setScalar(1.15); scene.add(guy);
+function pose(P, o) { P.armR.rotation.set(o.rx || 0, 0, o.rz ?? 0.05); P.armL.rotation.set(o.lx || 0, 0, o.lz ?? -0.05); P.head.rotation.set(o.hx || 0, o.hy || 0, o.hz || 0); }
+function setBelly(P, b) { P.belly.scale.set(b, b, 0.55 * b); P.belly.position.set(0, 1.08 - 0.03 * (b - 1), 0.06 + 0.11 * (b - 1)); }
+function setGhostBody(k) { guyMats.forEach(m => { m.opacity = lerp(1, 0.22, k); m.depthWrite = k < 0.5; }); }
+// órgãos (raio-x)
+const stomach = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshStandardMaterial({ color: 0xF07A8A, roughness: 0.5, emissive: 0x5A1020 }));
+stomach.visible = false; guy.add(stomach);
+const ghost = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshStandardMaterial({ color: 0xF2B233, transparent: true, opacity: 0.4, roughness: 0.4, depthWrite: false }));
+ghost.visible = false; guy.add(ghost);
+const R05 = 0.075; const rOf = L => R05 * Math.cbrt(L / 0.5);
+const liver = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshStandardMaterial({ color: 0x8E2A2A, roughness: 0.5, emissive: 0x3A0808 }));
+liver.scale.set(0.16, 0.08, 0.09); liver.position.set(-0.1, 1.2, 0.05); liver.visible = false; guy.add(liver);
+const kidneys = new THREE.Group(); guy.add(kidneys); kidneys.visible = false;
+for (const sx of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: 0xB0413E, roughness: 0.5, emissive: 0x3A0808 })); k.scale.set(0.05, 0.08, 0.045); k.position.set(sx * 0.12, 1.0, -0.06); kidneys.add(k); }
+const brain = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshStandardMaterial({ color: 0xF2A0B0, roughness: 0.6, emissive: 0x501020, flatShading: true }));
+brain.scale.set(0.1, 0.085, 0.11); brain.visible = false; guy.userData.P.head.add(brain); brain.position.set(0, 0.04, 0);
+function organs(on) { stomach.visible = ghost.visible = liver.visible = kidneys.visible = brain.visible = false; for (const o of on) o.visible = true; }
+
+// ================= balança de gangorra: caneca de 50 L x saco de cimento =================
+const seesaw = new THREE.Group(); scene.add(seesaw); seesaw.visible = false;
+const plank = new THREE.Group(); seesaw.add(plank);
+{ const base = cyl(0.05, 0.3, 0.6, 8, M(0x555B66)); base.position.y = 0.3; seesaw.add(base);
+  const pl = box(3.2, 0.08, 0.6, M(0xB07A46)); plank.add(pl); plank.position.y = 0.64;
+  // caneca gigante (esquerda)
+  const mug = new THREE.Group(); mug.position.set(-1.15, 0.04, 0); plank.add(mug);
+  const glass = cyl(0.34, 0.3, 0.8, 14, new THREE.MeshStandardMaterial({ color: 0xF2B233, roughness: 0.2, transparent: true, opacity: 0.85 })); glass.position.y = 0.4; mug.add(glass);
+  const foam = cyl(0.35, 0.35, 0.16, 14, M(0xFFF8E6)); foam.position.y = 0.86; mug.add(foam);
+  const hnd = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.045, 6, 12, Math.PI), M(0xF7E3A8, { transparent: true, opacity: 0.85 })); hnd.rotation.z = -Math.PI / 2; hnd.position.set(-0.34, 0.42, 0); mug.add(hnd);
+  const lab1 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.25), new THREE.MeshBasicMaterial({ map: textTex(["50 L"], 256, 128, "#ffffff", "#B8322A", 90) })); lab1.position.set(0, 0.42, 0.345); mug.add(lab1);
+  // saco de cimento (direita)
+  const bag = box(0.75, 0.32, 0.5, new THREE.MeshStandardMaterial({ color: 0xBDB4A0, roughness: 1 })); bag.position.set(1.15, 0.2, 0); plank.add(bag);
+  const lab2 = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.26), new THREE.MeshBasicMaterial({ map: textTex(["CIMENTO", "50 kg"], 512, 220, "#BDB4A0", "#333", 80) })); lab2.position.set(1.15, 0.2, 0.252); plank.add(lab2);
+}
+seesaw.position.set(-1.0, 0, 0.6);
+
+// ================= ambulância =================
+const amb = new THREE.Group(); scene.add(amb); amb.visible = false;
+const ambLights = [];
+{ const body = box(1.7, 1.2, 3.2, M(0xF7F7F7)); body.position.y = 1.0; amb.add(body);
+  const cab = box(1.7, 0.9, 1.1, M(0xF7F7F7)); cab.position.set(0, 0.85, 2.1); amb.add(cab);
+  const win = box(1.6, 0.4, 0.05, M(0x7FB6D9)); win.position.set(0, 1.05, 2.66); amb.add(win);
+  const stripe = box(1.72, 0.18, 3.22, M(0xE0383E)); stripe.position.y = 0.85; amb.add(stripe);
+  const cross = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), new THREE.MeshBasicMaterial({ map: textTex(["+"], 256, 256, "#F7F7F7", "#E0383E", 260) })); cross.rotation.y = Math.PI / 2; cross.position.set(0.86, 1.25, -0.2); amb.add(cross);
+  for (const z of [-1.0, 1.0, 2.2]) for (const x of [-0.8, 0.8]) { const wh = cyl(0.3, 0.3, 0.2, 10, M(0x222222)); wh.rotation.z = Math.PI / 2; wh.position.set(x, 0.3, z > 2 ? 2.1 : z); amb.add(wh); }
+  for (const x of [-0.4, 0.4]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.16, 0.25), new THREE.MeshBasicMaterial({ color: x < 0 ? 0xFF2A2A : 0x2A6BFF })); l.position.set(x, 1.68, 0.4); amb.add(l); ambLights.push(l); }
+}
+// cama de hospital + soro
+const bed = new THREE.Group(); scene.add(bed); bed.visible = false;
+{ const fr = box(1.0, 0.1, 2.2, M(0xC8CDD6)); fr.position.y = 0.6; bed.add(fr);
+  const mat = box(0.95, 0.15, 2.1, M(0xF4F4F4)); mat.position.y = 0.72; bed.add(mat);
+  const pil = box(0.6, 0.12, 0.35, M(0xFFFFFF)); pil.position.set(0, 0.85, -0.85); bed.add(pil);
+  const sheet = box(0.98, 0.1, 1.2, M(0x8FC3E8)); sheet.position.set(0, 0.84, 0.45); bed.add(sheet);
+  for (const [x, z] of [[-0.45, -1], [0.45, -1], [-0.45, 1], [0.45, 1]]) { const l = box(0.06, 0.6, 0.06, M(0x9AA0A8)); l.position.set(x, 0.3, z); bed.add(l); }
+  const head = box(1.0, 0.7, 0.06, M(0xC8CDD6)); head.position.set(0, 0.95, -1.1); bed.add(head);
+  const pole = cyl(0.02, 0.02, 1.9, 6, M(0x9AA0A8)); pole.position.set(0.75, 0.95, -0.9); bed.add(pole);
+  const bagIV = box(0.18, 0.28, 0.06, new THREE.MeshStandardMaterial({ color: 0xDDEEFF, transparent: true, opacity: 0.8 })); bagIV.position.set(0.75, 1.75, -0.9); bed.add(bagIV);
+}
+bed.position.set(0.3, 0, 0.3);
+
+// ================= respingos verdes (o corpo devolve) =================
+const NSP = 40;
+const splash = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.05, 0), M(0xC9D84A, { roughness: 0.3 }), NSP); splash.frustumCulled = false; scene.add(splash);
+function drawSplash(t, t0, origin) {
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3();
+  for (let i = 0; i < NSP; i++) {
+    const u = t0 == null ? -1 : t - t0 - (i % 10) * 0.04;
+    if (u < 0 || u > 1.3) { m.makeScale(0, 0, 0); splash.setMatrixAt(i, m); continue; }
+    const vx = (hash(i) - .5) * 1.0, vz = 1.2 + hash(i + 3) * 1.4, vy = 0.6 + hash(i + 6) * 1.2;
+    const y = Math.max(0.03, origin.y + vy * u - 4.9 * u * u);
+    v.set(origin.x + vx * u, y, origin.z + vz * u); s.setScalar(0.8 + hash(i + 9)); m.compose(v, q, s); splash.setMatrixAt(i, m);
+  }
+  splash.instanceMatrix.needsUpdate = true;
+}
+
+// ================= HUD =================
+const out = document.getElementById("out"), ctx = out.getContext("2d");
+const KEY = new Set(["cinquenta", "litros", "cerveja", "barril", "cento", "quarenta", "latas", "décima", "lata", "barriga", "bola", "contador", "começo", "quilos", "cimento", "estômago", "quatro", "álcool", "dois", "meio", "puro", "fígado", "hora", "seis", "dias", "primeira", "primeiro", "limite", "sangue", "equilíbrio", "devolve", "tudo", "rins", "litro", "sódio", "cérebro", "incha", "respiração", "lenta", "internação", "semana", "gordura", "vinte", "mil", "calorias", "dez", "absurda", "água", "pura", "hospital", "sério", "tente", "exagero", "comenta", "dia"]);
+function shadowText(on) { ctx.shadowColor = on ? "rgba(0,0,0,.5)" : "transparent"; ctx.shadowBlur = on ? 14 : 0; ctx.shadowOffsetY = on ? 2 : 0; }
+const CAPS = (() => {
+  const out = []; let cur = [];
+  const flush = () => { if (cur.length) { out.push({ words: cur.map(w => w.w), s: cur[0].s, e: cur[cur.length - 1].e }); cur = []; } };
+  TL.words.forEach((w, i) => { cur.push(w); const next = TL.words[i + 1]; if (cur.length >= 3 || /[.,?!:…]$/.test(w.w) || !next || next.seg !== w.seg || next.s - w.e > 0.35) flush(); });
+  for (let i = 0; i < out.length; i++) out[i].until = i + 1 < out.length ? Math.min(out[i + 1].s, out[i].e + 0.6) : out[i].e + 0.6;
+  return out;
+})();
+function captions(t) {
+  const c = CAPS.find(c => t >= c.s - 0.05 && t < c.until); if (!c) return;
+  const pop = spring(t - c.s + 0.05, 2.4, 0.55);
+  ctx.save(); ctx.translate(W / 2, 1400); ctx.scale(0.85 + 0.15 * pop, 0.85 + 0.15 * pop);
+  ctx.font = '900 92px "Inter"'; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  const words = c.words.map(w => w.toUpperCase()), sp = 26, ws = words.map(w => ctx.measureText(w).width);
+  let total = ws.reduce((a, b) => a + b, 0) + sp * (words.length - 1), scale = Math.min(1, 980 / total);
+  ctx.scale(scale, scale); let x = -total / 2;
+  words.forEach((w, i) => {
+    const raw = c.words[i].toLowerCase().replace(/[^a-zà-ú0-9-]/g, "");
+    ctx.lineWidth = 16; ctx.strokeStyle = "#111"; ctx.strokeText(w, x, 0);
+    ctx.fillStyle = KEY.has(raw) ? "#FFD21F" : "#FFFFFF"; ctx.fillText(w, x, 0); x += ws[i] + sp;
+  });
+  ctx.restore();
+}
+function tag(text, x, y, a, color = "#FFD21F", size = 40) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); ctx.font = `900 ${size}px "Inter"`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  const s = 0.6 + 0.4 * clamp(a); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.lineWidth = Math.max(10, size / 7); ctx.strokeStyle = "#111"; ctx.strokeText(text, 0, 0); ctx.fillStyle = color; ctx.fillText(text, 0, 0); ctx.restore();
+}
+function pill(text, x, y, a, ok) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); ctx.font = '800 34px "Inter"'; const w = ctx.measureText(text).width + 110;
+  ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.beginPath(); ctx.roundRect(x - w / 2, y - 34, w, 68, 34); ctx.fill();
+  ctx.fillStyle = ok ? "#1E9E52" : "#E0383E"; ctx.beginPath(); ctx.arc(x - w / 2 + 38, y, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#222"; ctx.textBaseline = "middle"; ctx.fillText(text, x - w / 2 + 70, y + 1);
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.beginPath();
+  if (ok) { ctx.moveTo(x - w / 2 + 29, y); ctx.lineTo(x - w / 2 + 36, y + 8); ctx.lineTo(x - w / 2 + 48, y - 8); } else { ctx.moveTo(x - w / 2 + 31, y - 7); ctx.lineTo(x - w / 2 + 45, y + 7); ctx.moveTo(x - w / 2 + 45, y - 7); ctx.lineTo(x - w / 2 + 31, y + 7); }
+  ctx.stroke(); ctx.restore();
+}
+function counter(label, value, sub, a, color = "#fff") {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); shadowText(true); ctx.fillStyle = "#fff";
+  ctx.font = '800 34px "Inter"'; ctx.letterSpacing = "5px"; ctx.fillText(label, 64, 330); ctx.letterSpacing = "0px";
+  ctx.font = '900 118px "Inter"'; ctx.lineJoin = "round"; ctx.lineWidth = 10; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.strokeText(value, 58, 450); ctx.fillStyle = color; ctx.fillText(value, 58, 450);
+  ctx.fillStyle = "#fff"; ctx.font = '800 28px "Inter"'; ctx.letterSpacing = "3px"; ctx.fillText(sub, 64, 500); ctx.restore();
+}
+function stamp(text, a, color = "#E0383E") {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); ctx.translate(W - 60, 290); const s = 0.7 + 0.3 * clamp(a); ctx.scale(s, s);
+  ctx.font = '900 44px "Inter"'; ctx.textAlign = "right"; ctx.textBaseline = "middle"; const w = ctx.measureText(text).width + 50;
+  ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(-w, -36, w, 72, 18); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.fillText(text, -25, 3); ctx.restore();
+}
+// barra de progresso das latas (fica no topo, abaixo do contador)
+function canBar(done, total, a) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); const x0 = 64, y0 = 540, w = 600, h = 30;
+  ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.beginPath(); ctx.roundRect(x0, y0, w, h, 15); ctx.fill();
+  ctx.fillStyle = "#FFD21F"; ctx.beginPath(); ctx.roundRect(x0, y0, Math.max(30, w * done / total), h, 15); ctx.fill(); ctx.restore();
+}
+// calendário de dias (fígado trabalhando)
+function days(k, a) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = clamp(a); const n = 6, bw = 132, gap = 16, x0 = (W - (n * bw + (n - 1) * gap)) / 2, y0 = 600;
+  for (let i = 0; i < n; i++) {
+    const on = clamp(k * n - i); const x = x0 + i * (bw + gap);
+    ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.beginPath(); ctx.roundRect(x, y0, bw, 150, 18); ctx.fill();
+    ctx.fillStyle = "#E0383E"; ctx.beginPath(); ctx.roundRect(x, y0, bw, 40, [18, 18, 0, 0]); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.font = '800 24px "Inter"'; ctx.textAlign = "center"; ctx.fillText("DIA", x + bw / 2, y0 + 29);
+    ctx.fillStyle = "#222"; ctx.font = '900 70px "Inter"'; ctx.fillText(String(i + 1), x + bw / 2, y0 + 118);
+    if (on > 0) { ctx.globalAlpha = clamp(a) * on; ctx.strokeStyle = "#1E9E52"; ctx.lineWidth = 12; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x + 28, y0 + 92); ctx.lineTo(x + 56, y0 + 122); ctx.lineTo(x + 106, y0 + 62); ctx.stroke(); ctx.globalAlpha = clamp(a); }
+  }
+  ctx.restore();
+}
+function project(v, cam = camera) { const p = new THREE.Vector3(...v).project(cam); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H, p.z]; }
+function handle() { ctx.save(); ctx.globalAlpha = 0.9; shadowText(true); ctx.fillStyle = "#fff"; ctx.font = '800 30px "Inter"'; ctx.letterSpacing = "2px"; ctx.textAlign = "right"; ctx.fillText("@to.scale8", W - 56, 210); ctx.restore(); }
+
+// ================= câmera =================
+function look(a, b, k, cam = camera) { const p = a.p.map((v, i) => lerp(v, b.p[i], k)), q = a.q.map((v, i) => lerp(v, b.q[i], k)); cam.position.set(...p); cam.lookAt(...q); }
+const S = (p, q) => ({ p, q });
+const CUTS = (() => {
+  const c = TL.segs.map(s => s.start);
+  TL.words.forEach((w, i) => { const p = TL.words[i - 1]; if (p && p.seg === w.seg && /[.?!…:]$/.test(p.w)) c.push(w.s - 0.12); });
+  c.sort((a, b) => a - b);
+  const out = [], ends = [...c.slice(1), TL.total];
+  c.forEach((x, i) => { out.push(x); const len = ends[i] - x; if (len > 4.6) { const n = Math.ceil(len / 3.6); for (let k = 1; k < n; k++) out.push(x + len * k / n); } });
+  return out;
+})();
+function cam(t, t0, t1, shots, c = camera, sh = 0) {
+  const cs = CUTS.filter(x => x > t0 + 0.6 && x < t1 - 0.6);
+  let i = 0, s0 = t0, s1 = t1;
+  for (const x of cs) { if (t >= x) { i++; s0 = x; } else { s1 = x; break; } }
+  const [A, B] = shots[i % shots.length], u = prog(t, s0, s1);
+  const k = 0.55 * u + 0.45 * (1 - Math.cos(Math.PI * u)) / 2;
+  look(sh ? S(A.p.map((v, j) => j === 0 ? v + sh : v), A.q) : A, sh ? S(B.p.map((v, j) => j === 0 ? v + sh : v), B.q) : B, k, c);
+  return i;
+}
+// tomadas padrão em volta do boneco (x=0.4) e da mesa (x=-1.55)
+const GX = 0.45;
+
+// ================= seek =================
+window.seek = function (t) {
+  const seg = TL.segs.find(s => t >= s.start && t < s.end) || TL.segs[TL.segs.length - 1];
+  const lt = t - seg.start, dur = seg.end - seg.start, P = guy.userData.P;
+  // padrões
+  guy.position.set(GX, 0, 0.6); guy.rotation.set(0, 0, 0); guy.scale.setScalar(1.15); pose(P, { rx: -0.3, rz: 0.1 }); P.mouth.scale.set(1, 1, 1);
+  P.can.visible = true; setBelly(P, 1); setGhostBody(0); organs([]); P.skinMat.color.setHex(SKIN);
+  P.eyeL.scale.set(1, 1, 1); P.eyeR.scale.set(1, 1, 1);
+  seesaw.visible = false; amb.visible = false; bed.visible = false; table.visible = true;
+  const tHook0 = 0.05;
+  let gone = 0, wob = 0, cansOn = true, watersOn = false;
+  drawSplash(t, null, new THREE.Vector3());
+  const hud = [];
+
+  if (seg.id === "hook") {
+    const tLat = wordTime("hook", "cento") ?? seg.end - 2;
+    pose(P, { rx: -1.3 + 0.1 * Math.sin(t * 3), rz: 0.15, lx: -0.3, lz: -0.5 * Math.abs(Math.sin(t * 2)), hy: 0.25 * Math.sin(t * 1.3) }); P.mouth.scale.set(1.2, 2.2, 1);
+    if (t < 0.75) { // entra pulando em arco, achata ao pousar e volta com mola
+      const u = prog(t, 0, 0.42); guy.position.x = lerp(GX + 0.9, GX, easeOut(u)); guy.position.y = Math.max(0, 0.6 * Math.sin(Math.PI * u));
+      const sq = t < 0.42 ? 1 + 0.12 * Math.sin(Math.PI * u) : 1 - 0.22 * Math.exp(-(t - 0.42) * 9) * Math.cos((t - 0.42) * 22);
+      guy.scale.set(1.15 / Math.sqrt(sq), 1.15 * sq, 1.15 / Math.sqrt(sq));
+    }
+    if (t > tLat) { pose(P, { rx: -0.4, rz: 0.2, lx: -1.6, lz: 0.6, hy: 0.6 }); P.mouth.scale.set(1.4, 3, 1); }
+    cam(t, seg.start, seg.end, [[S([0.4, 2.6, 7.6], [-0.4, 1.4, 0]), S([0.0, 2.3, 6.4], [-0.5, 1.4, 0.2])], [S([2.6, 1.3, 4.4], [-1.2, 1.5, 0]), S([2.0, 1.5, 5.2], [-1.2, 1.5, 0])], [S([-0.4, 1.5, 3.6], [-1.55, 1.6, 0.2]), S([-0.9, 1.9, 4.2], [-1.55, 1.5, 0.2])]]);
+    if (t > tLat) hud.push(["counter", "50 LITROS DE CERVEJA", "~143", "LATAS DE 350 ML", clamp((t - tLat) / 0.3), "#FFD21F"]);
+  } else if (seg.id === "erro") {
+    const tD = wordTime("erro", "décima") ?? seg.start + 0.5, tB = wordTime("erro", "barriga") ?? seg.start + 1.5, tC = wordTime("erro", "contador") ?? seg.start + 3;
+    gone = Math.round(10 * easeOut(prog(t, seg.start, tD + 0.4)));
+    const b = 1 + 0.9 * spring(t - tB, 1.4, 0.45); setBelly(P, b);
+    const sip = Math.sin(t * 5);
+    pose(P, { rx: -2.3 + 0.2 * sip, rz: -0.45, lx: -0.3, lz: -0.2, hx: -0.35 }); P.mouth.scale.set(1.3, 2, 1);
+    if (t > tB + 0.4) { pose(P, { rx: -0.6, rz: 0.4, lx: -0.4, lz: -0.6, hx: 0.2 }); P.eyeL.scale.set(1.3, 1.6, 1); P.eyeR.scale.set(1.3, 1.6, 1); P.mouth.scale.set(1.5, 3, 1); }
+    cam(t, seg.start, seg.end, [[S([2.3, 1.9, 4.8], [GX, 1.35, 0.6]), S([2.0, 1.8, 4.3], [GX, 1.35, 0.6])], [S([-0.6, 2.0, 6.2], [-0.4, 1.3, 0.3]), S([-0.3, 2.1, 6.8], [-0.4, 1.4, 0.3])]]);
+    hud.push(["counter", "LATAS BEBIDAS", `${gone}/143`, t > tC ? "AINDA FALTAM ~133" : "E A BARRIGA JÁ ESTÁ ASSIM", clamp(lt / 0.3), "#FFD21F"]);
+    hud.push(["canBar", gone, 143, clamp(lt / 0.3)]);
+  } else if (seg.id === "peso") {
+    const tCim = wordTime("peso", "cimento") ?? seg.start + 3, tE = wordTime("peso", "estômago") ?? seg.start + 5, t4 = wordTime("peso", "quatro") ?? seg.start + 7;
+    const t50 = wordTime("peso", "cinquenta", 1) ?? seg.start + 1.5;
+    if (t < tE - 0.12) {
+      seesaw.visible = true; table.visible = false; guy.position.set(-1.0, 0, -0.7); guy.rotation.y = 0;
+      const tilt = -0.25 * (1 - spring(t - tCim + 0.3, 1.0, 0.35)); plank.rotation.z = t < tCim - 0.3 ? -0.25 : tilt;
+      pose(P, { rx: -0.5, rz: 0.3, lx: -1.4, lz: -0.2, hy: -0.4 });
+      cam(t, seg.start, tE - 0.12, [[S([-1.0, 2.3, 8.2], [-1.0, 1.1, 0.6]), S([-1.0, 2.1, 7.4], [-1.0, 1.1, 0.6])], [S([0.4, 2.0, 8.4], [-1.0, 1.0, 0.6]), S([0.1, 1.9, 7.8], [-1.0, 1.0, 0.6])]]);
+      hud.push(["counter", "50 L DE CERVEJA", t > t50 ? "~50 kg" : "", t > tCim ? "= 1 SACO DE CIMENTO" : "PESO", clamp((t - t50 + 0.2) / 0.3), "#FFD21F"]);
+    } else {
+      setGhostBody(easeInOut(prog(t, tE - 0.12, tE + 0.5))); P.can.visible = false;
+      const L = t < t4 ? lerp(1, 4, easeOut(prog(t, tE, tE + 1.0))) : 4;
+      const r = rOf(L); organs([stomach]); stomach.scale.set(r, r * 0.8, r * 0.8); stomach.position.set(0.02, 1.08 + r * 0.2, 0.06);
+      if (t > t4 + 0.1) { const g = spring(t - t4 - 0.1, 1.3, 0.6), rg = rOf(50) * g; ghost.visible = g > 0.01; ghost.scale.set(rg, rg * 0.9, rg * 0.9); ghost.position.set(0.02, 1.15, 0.08); }
+      guy.rotation.y = 0.15; pose(P, { rz: 0.15, lz: -0.15 });
+      look(S([GX + 0.3, 1.6, 4.0], [GX, 1.25, 0.6]), S([GX + 0.1, 1.55, 3.4], [GX, 1.25, 0.6]), easeInOut(prog(t, tE, seg.end)));
+      hud.push(["counter", t < t4 + 0.8 ? "SEU ESTÔMAGO" : "50 L NÃO CABEM", t < t4 ? "" : t < t4 + 0.8 ? "~4 L" : "50 L", t < t4 + 0.8 ? "ESTICADO AO MÁXIMO" : "NEM DE LONGE (~12 ESTÔMAGOS)", clamp((t - tE) / 0.3), t > t4 + 0.8 ? "#FF5A4E" : "#fff"]);
+    }
+  } else if (seg.id === "alcool") {
+    const tA = wordTime("alcool", "nesses") ?? seg.start + 1, tF = wordTime("alcool", "fígado") ?? seg.start + 4, tS = wordTime("alcool", "seis") ?? seg.end - 2, tOu = wordTime("alcool", "ou") ?? tS - 1;
+    setGhostBody(1); P.can.visible = false;
+    if (t < tF - 0.12) {
+      organs([]); ghost.visible = true; const r = rOf(2.5) * spring(t - tA, 1.4, 0.6); ghost.scale.set(r, r * 0.9, r * 0.9); ghost.position.set(0.02, 1.12, 0.08);
+      ghost.material.color.setHex(0xEDE6C8);
+      pose(P, { rx: -0.5, rz: 0.2, lx: -0.5, lz: -0.2, hy: 0.2 });
+      cam(t, seg.start, tF - 0.12, [[S([GX + 0.6, 1.8, 4.6], [GX, 1.3, 0.6]), S([GX + 0.3, 1.6, 3.8], [GX, 1.25, 0.6])], [S([GX - 1.2, 1.5, 3.6], [GX, 1.25, 0.6]), S([GX - 0.8, 1.4, 3.2], [GX, 1.25, 0.6])]]);
+      hud.push(["counter", "ÁLCOOL PURO", "~2,5 L", "CERVEJA TEM ~5% DE ÁLCOOL", clamp((t - tA) / 0.3), "#FFD21F"]);
+    } else {
+      ghost.material.color.setHex(0xF2B233);
+      organs([liver]); const pulse = 1 + 0.12 * Math.abs(Math.sin(t * 5)); liver.scale.set(0.2 * pulse, 0.1 * pulse, 0.11 * pulse); liver.position.set(-0.1, 1.22, 0.08);
+      pose(P, { rx: -0.2, rz: 0.3, lx: -0.2, lz: -0.3 });
+      cam(t, tF - 0.12, seg.end, [[S([GX - 0.2, 1.5, 2.6], [GX - 0.1, 1.4, 0.6]), S([GX - 0.1, 1.45, 2.3], [GX - 0.1, 1.4, 0.6])], [S([GX + 1.4, 1.9, 3.2], [GX, 1.4, 0.6]), S([GX + 1.0, 1.8, 2.8], [GX, 1.4, 0.6])], [S([GX + 0.2, 2.6, 4.6], [GX, 1.4, 0.6]), S([GX - 0.2, 2.4, 4.0], [GX, 1.4, 0.6])]]);
+      hud.push(["counter", "FÍGADO LIMPA", t > tS ? "~143 h" : "~1 lata", t > tS ? "≈ 6 DIAS SEM PARAR" : "DE CERVEJA POR HORA", clamp((t - tF) / 0.3), t > tS ? "#FF5A4E" : "#FFD21F"]);
+      hud.push(["days", easeOut(prog(t, tOu, tS + 0.6)), clamp((t - tOu + 0.2) / 0.3)]);
+    }
+  } else if (seg.id === "hora") {
+    const tSg = wordTime("hora", "álcool") ?? seg.start + 3, tEq = wordTime("hora", "equilíbrio") ?? seg.start + 4.5, tDv = wordTime("hora", "devolve") ?? seg.end - 1.5;
+    const b = 2.3 + 0.08 * Math.sin(t * 7); setBelly(P, b); P.can.visible = t < tSg;
+    const wobble = t > tSg ? Math.sin(t * 2.6) * 0.16 * prog(t, tSg, tSg + 0.6) : 0;
+    guy.rotation.z = wobble; guy.position.x = GX + wobble * 0.6;
+    P.skinMat.color.lerpColors(new THREE.Color(SKIN), new THREE.Color(0xA8C890), prog(t, tEq, tDv));
+    pose(P, { rx: -0.7 + wobble, rz: 0.9, lx: -0.7 - wobble, lz: -0.9, hz: -wobble * 1.5 }); P.mouth.scale.set(1.3, 2 + Math.abs(Math.sin(t * 6)), 1);
+    let sh = 0;
+    if (t > tDv) { const f = easeOut(prog(t, tDv - 0.1, tDv + 0.3)); guy.rotation.x = 0.55 * f; pose(P, { rx: -0.4, rz: 0.3, lx: -0.4, lz: -0.3, hx: 0.5 * f }); P.mouth.scale.set(2, 4, 1); const mw = new THREE.Vector3(); P.mouth.getWorldPosition(mw); drawSplash(t, tDv + 0.05, mw); sh = t < tDv + 0.5 ? Math.sin(t * 80) * 0.04 : 0; }
+    cam(t, seg.start, seg.end, [[S([GX + 0.6, 2.4, 5.6], [GX, 1.65, 0.6]), S([GX + 0.4, 2.2, 5.0], [GX, 1.65, 0.6])], [S([GX + 2.4, 1.4, 3.8], [GX, 1.8, 0.6]), S([GX + 2.0, 1.5, 4.2], [GX, 1.8, 0.6])], [S([GX - 1.6, 2.1, 4.8], [GX, 1.6, 0.8]), S([GX - 1.2, 2.3, 5.4], [GX, 1.55, 0.8])], [S([GX + 0.9, 1.8, 4.8], [GX, 1.3, 1.2]), S([GX + 1.3, 2.1, 5.8], [GX, 1.25, 1.3])]], camera, sh);
+    hud.push(["stamp", "1 HORA", clamp(spring(lt, 1.6, 0.6))]);
+    hud.push(["pill", "ESTÔMAGO NO LIMITE", 540, 620, clamp(lt / 0.3), false]);
+    hud.push(["pill", "PERDE O EQUILÍBRIO", 540, 710, clamp((t - tEq) / 0.3), false]);
+    hud.push(["pill", "VÔMITO", 540, 800, clamp((t - tDv) / 0.3), false]);
+  } else if (seg.id === "dia") {
+    const tR = wordTime("dia", "rins") ?? seg.start + 1, tSo = wordTime("dia", "sódio") ?? seg.start + 4, tCe = wordTime("dia", "cérebro") ?? seg.start + 5.5, tRe = wordTime("dia", "respiração") ?? seg.start + 7, tI = wordTime("dia", "internação") ?? seg.end - 1.5;
+    const tCut = (wordTime("dia", "é") ?? tI - 0.3) - 0.12;
+    P.can.visible = false;
+    if (t < tCut) {
+      setGhostBody(1); setBelly(P, 1.8);
+      if (t < tCe - 0.12) { organs([kidneys]); const p = 1 + 0.1 * Math.sin(t * 6); kidneys.scale.setScalar(p * 1.3); }
+      else { organs([brain]); const sw = 1 + 0.25 * easeOut(prog(t, tCe, tCe + 1.5)) + 0.04 * Math.sin(t * 7); brain.scale.set(0.1 * sw, 0.085 * sw, 0.11 * sw); }
+      pose(P, { rx: -0.2, rz: 0.4, lx: -0.2, lz: -0.4, hx: 0.15 * Math.sin(t * 1.2) });
+      const shots = t < tCe - 0.12 ? [[S([GX - 1.2, 1.5, -1.6], [GX, 1.15, 0.6]), S([GX - 0.9, 1.4, -1.2], [GX, 1.15, 0.6])], [S([GX + 1.3, 1.6, 3.0], [GX, 1.15, 0.6]), S([GX + 0.9, 1.5, 2.6], [GX, 1.15, 0.6])]] : [[S([GX + 0.25, 2.15, 1.8], [GX, 1.95, 0.6]), S([GX + 0.15, 2.05, 1.55], [GX, 1.95, 0.6])], [S([GX + 0.9, 2.2, 1.9], [GX, 1.9, 0.6]), S([GX + 0.6, 2.1, 1.7], [GX, 1.9, 0.6])]];
+      cam(t, t < tCe - 0.12 ? seg.start : tCe - 0.12, t < tCe - 0.12 ? tCe - 0.12 : tCut, shots);
+      if (t < tSo) hud.push(["counter", "OS RINS TIRAM", "~1 L", "DE ÁGUA POR HORA, NO MÁXIMO", clamp((t - tR) / 0.3), "#FFD21F"]);
+      else hud.push(["counter", "SÓDIO DO SANGUE", "↓ BAIXO", "HIPONATREMIA", 1, "#FF5A4E"]);
+      hud.push(["pill", "CÉREBRO INCHA", 540, 620, clamp((t - tCe) / 0.3), false]);
+      hud.push(["pill", "RESPIRAÇÃO LENTA", 540, 710, clamp((t - tRe) / 0.3), false]);
+    } else {
+      // ambulância chega com mola
+      amb.visible = true; table.visible = true; const k = spring(t - tCut, 1.2, 0.6);
+      amb.position.set(lerp(10, 3.4, k), 0, 3.4); amb.rotation.y = -Math.PI / 2;
+      ambLights.forEach((l, i) => l.material.color.setHex(Math.floor(t * 6 + i) % 2 ? (i ? 0x2A6BFF : 0xFF2A2A) : 0x333333));
+      guy.rotation.set(-1.5, 0.4, 0); guy.position.set(GX - 0.4, 0.22, 1.2); setBelly(P, 2.0); P.skinMat.color.setHex(0xA8C890); pose(P, { rz: 1.2, lz: -1.2 }); P.mouth.scale.set(1.2, 1.5, 1);
+      look(S([-1.8, 4.6, 10.5], [1.4, 0.9, 2.2]), S([-1.4, 4.2, 9.6], [1.4, 0.9, 2.2]), easeOut(prog(t, tCut, seg.end)));
+      hud.push(["pill", "INTERNAÇÃO NA CERTA", 540, 620, clamp((t - tI) / 0.3), false]);
+    }
+    hud.push(["stamp", "1 DIA", clamp(spring(lt, 1.6, 0.6))]);
+  } else if (seg.id === "semana") {
+    const tSb = wordTime("semana", "sobrevivesse") ?? seg.start + 1.5, tG = wordTime("semana", "gordura") ?? seg.start + 3, tV = wordTime("semana", "vinte") ?? seg.start + 5, tD = wordTime("semana", "dez") ?? seg.end - 1;
+    bed.visible = true; table.visible = false; P.can.visible = false;
+    guy.rotation.set(-Math.PI / 2 + 0.25, 0, 0); guy.position.set(0.3, 0.95, 1.15); setBelly(P, 1.6);
+    pose(P, { rz: 0.15, lz: -0.15, hx: 0.25 }); P.mouth.scale.set(1, 1.3, 1);
+    if (t > tSb && t < tV - 0.12) { setGhostBody(1); organs([liver]); liver.scale.set(0.2, 0.1, 0.11); liver.material.color.lerpColors(new THREE.Color(0x8E2A2A), new THREE.Color(0xE8C25A), easeOut(prog(t, tG, tG + 1.0))); }
+    else liver.material.color.setHex(0x8E2A2A);
+    if (t < tSb) look(S([2.6, 2.6, 3.6], [0.3, 0.9, 0.3]), S([2.2, 2.4, 3.2], [0.3, 0.9, 0.3]), easeInOut(prog(t, seg.start, tSb)));
+    else if (t < tV - 0.12) look(S([1.3, 3.4, 2.2], [0.3, 0.95, 0.3]), S([1.1, 3.2, 1.9], [0.3, 0.95, 0.3]), easeInOut(prog(t, tSb, tV)));
+    else cam(t, tV - 0.12, seg.end, [[S([-1.8, 2.0, 3.6], [0.3, 1.0, 0.3]), S([-1.4, 2.2, 3.2], [0.3, 1.0, 0.3])], [S([0.3, 3.4, 4.4], [0.3, 0.9, 0.2]), S([0.3, 3.0, 3.8], [0.3, 0.9, 0.2])]]);
+    hud.push(["stamp", "1 SEMANA", clamp(spring(lt, 1.6, 0.6))]);
+    if (t > tSb && t < tV - 0.12) hud.push(["pill", "FÍGADO CHEIO DE GORDURA", 540, 620, clamp((t - tG) / 0.3), false]);
+    if (t > tV - 0.12) hud.push(["counter", "CALORIAS", "~21 mil", t > tD ? "≈ 10 DIAS DE COMIDA" : "KCAL (TACO: ~43 A CADA 100 G)", clamp((t - tV + 0.12) / 0.3), "#FFD21F"]);
+  } else if (seg.id === "virada") {
+    const tAg = wordTime("virada", "mesmo") ?? seg.start + 1.5, tW = wordTime("virada", "água") ?? seg.start + 2.5, tHo = wordTime("virada", "hospital") ?? seg.end - 1.5;
+    cansOn = t < tAg - 0.12; watersOn = !cansOn;
+    pose(P, { rx: -1.6, rz: 0.2, lx: -0.2, hy: 0.6 }); P.mouth.scale.set(1.3, 2.5, 1); P.can.visible = false;
+    if (t > tHo) { pose(P, { rx: -2.7, rz: 0.4, lx: -2.7, lz: -0.4 }); P.eyeL.scale.set(1.3, 1.6, 1); P.eyeR.scale.set(1.3, 1.6, 1); P.mouth.scale.set(1.6, 3.4, 1); }
+    cam(t, seg.start, seg.end, [[S([0.5, 2.2, 6.0], [-0.6, 1.5, 0.3]), S([0.2, 2.1, 5.3], [-0.6, 1.5, 0.3])], [S([-0.2, 1.4, 3.4], [-1.55, 1.4, 0.2]), S([-0.6, 1.7, 3.9], [-1.55, 1.4, 0.2])], [S([2.0, 1.6, 4.4], [-0.5, 1.4, 0.2]), S([1.6, 1.8, 5.0], [-0.5, 1.4, 0.2])]]);
+    if (t > tW) hud.push(["counter", "50 L DE ÁGUA PURA", "TAMBÉM", t > tHo ? "LEVA PRO HOSPITAL" : "FAZ MAL", clamp((t - tW) / 0.3), "#FF5A4E"]);
+  } else if (seg.id === "cta") {
+    pose(P, { rz: 0.4 + 2.2 * spring(lt - 0.3, 1.2, 0.5), rx: -0.3, lx: -0.2 }); P.mouth.scale.set(1, 2.5, 1); P.can.visible = false;
+    cansOn = true;
+    cam(t, seg.start, seg.end, [[S([0.6, 2.6, 7.8], [-0.4, 1.9, -0.5]), S([0.3, 2.4, 6.8], [-0.4, 1.85, -0.5])], [S([2.4, 2.0, 6.4], [-0.2, 1.9, -0.5]), S([1.8, 2.2, 5.8], [-0.2, 1.9, -0.5])], [S([-1.2, 2.5, 7.4], [-0.2, 1.9, -0.5]), S([-0.4, 2.4, 6.8], [-0.2, 1.9, -0.5])]]);
+  }
+
+  // latas (pirâmide): caem no começo do vídeo e somem conforme o boneco bebe
+  const goneAll = seg.id === "hook" ? 0 : seg.id === "erro" ? gone : 10;
+  drawCans(cans, t, cansOn && table.visible ? tHook0 : null, goneAll, wob);
+  drawCans(waters, t, watersOn && table.visible ? (wordTime("virada", "mesmo") ?? 0) - 1.0 : null, 10, 0);
+
+  renderer.render(scene, camera);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.drawImage(glCanvas, 0, 0, W, H);
+  { const gr = ctx.createLinearGradient(0, 0, 0, 900); gr.addColorStop(0, "rgba(0,0,0,.55)"); gr.addColorStop(0.7, "rgba(0,0,0,.25)"); gr.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, 900); }
+  handle();
+
+  if (seg.id === "hook") {
+    const tEnd = (wordTime("hook", "não") ?? seg.start + 3) + 0.1;
+    const a = 1 - prog(t, tEnd, tEnd + 0.3);
+    const s1 = spring(lt - 0.05, 1.6, 0.7), s2 = spring(lt - 0.25, 1.3, 0.5), s3 = spring(lt - 0.45, 1.6, 0.7);
+    if (a > 0) {
+      ctx.save(); ctx.textAlign = "center"; ctx.lineJoin = "round";
+      ctx.globalAlpha = a * clamp(s1 * 1.5); ctx.font = '800 66px "Inter"'; ctx.lineWidth = 12; ctx.strokeStyle = "#111"; ctx.strokeText("E se você tomasse", W / 2, 360 + 30 * (1 - s1)); ctx.fillStyle = "#fff"; ctx.fillText("E se você tomasse", W / 2, 360 + 30 * (1 - s1));
+      ctx.save(); ctx.globalAlpha = a * clamp(s2 * 1.5); ctx.translate(W / 2, 510); ctx.scale(0.75 + 0.25 * s2, 0.75 + 0.25 * s2);
+      ctx.font = '900 140px "Inter"'; ctx.lineWidth = 20; ctx.strokeText("50 LITROS", 0, 0); ctx.fillStyle = "#FFD21F"; ctx.fillText("50 LITROS", 0, 0); ctx.restore();
+      ctx.globalAlpha = a * clamp(s3 * 1.5); ctx.font = '800 66px "Inter"'; ctx.lineWidth = 12; ctx.strokeStyle = "#111"; ctx.strokeText("de cerveja?", W / 2, 640 + 30 * (1 - s3)); ctx.fillStyle = "#fff"; ctx.fillText("de cerveja?", W / 2, 640 + 30 * (1 - s3));
+      ctx.restore();
+    }
+    const tLat = wordTime("hook", "cento") ?? seg.end - 2;
+    if (t > tLat) { const q = project([TABLE_X, TABLE_Y + 7 * CH + 0.35, TABLE_Z]); tag("143 LATAS", q[0], Math.max(640, q[1] - 40), clamp((t - tLat) / 0.25), "#FFD21F", 76); }
+  }
+  if (seg.id === "erro") { const tB = wordTime("erro", "barriga") ?? seg.start + 1.5; tag("BUUURP!", W / 2 + 160, 900, clamp((t - tB - 0.3) / 0.2) * (1 - prog(t, tB + 1.6, tB + 2.0)), "#FFFFFF", 110); }
+  if (seg.id === "hora") { const tDv = wordTime("hora", "devolve") ?? seg.end - 1.5; tag("BLÉÉÉ!", W / 2 + 200, 1130, clamp((t - tDv) / 0.15), "#C9D84A", 140); }
+  if (seg.id === "dia") { const tI = wordTime("dia", "internação") ?? seg.end - 1.5; const tCut = (wordTime("dia", "é") ?? tI - 0.3) - 0.12; if (t > tCut) tag("UIÓÓ UIÓÓ!", W / 2, 860, clamp((t - tCut) / 0.2) * (0.75 + 0.25 * Math.abs(Math.sin(t * 6))), "#FFFFFF", 100); }
+  if (seg.id === "virada") { const tAg = wordTime("virada", "mesmo") ?? seg.start + 1.5; if (t > tAg) { const q = project([TABLE_X, TABLE_Y + 7 * CH + 0.35, TABLE_Z]); tag("ÁGUA", q[0], Math.max(640, q[1] - 40), clamp((t - tAg) / 0.25), "#7FC8FF", 90); } }
+  for (const h of hud) {
+    if (h[0] === "counter") counter(h[1], h[2], h[3], h[4], h[5]);
+    if (h[0] === "pill") pill(h[1], h[2], h[3], h[4], h[5]);
+    if (h[0] === "stamp") stamp(h[1], h[2]);
+    if (h[0] === "canBar") canBar(h[1], h[2], h[3]);
+    if (h[0] === "days") days(h[1], h[2]);
+  }
+  if (seg.id === "cta") {
+    const a = clamp(spring(lt - 0.2, 1.4, 0.7) * 1.3);
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.textAlign = "center"; ctx.lineJoin = "round"; ctx.font = '900 92px "Inter"'; ctx.lineWidth = 18; ctx.strokeStyle = "#111";
+    ctx.strokeText("NÃO TENTE ISSO", W / 2, 300); ctx.fillStyle = "#FF5A4E"; ctx.fillText("NÃO TENTE ISSO", W / 2, 300);
+    ctx.fillStyle = "#FFD21F"; ctx.beginPath(); ctx.roundRect(110, 370, 860, 250, 28); ctx.fill();
+    ctx.fillStyle = "#111"; ctx.font = '900 66px "Inter"'; ctx.fillText("Qual exagero", W / 2, 470); ctx.fillText("vem a seguir?", W / 2, 555);
+    ctx.font = '900 58px "Inter"'; ctx.fillStyle = "#fff"; ctx.lineWidth = 14; ctx.strokeText("COMENTA ↓", W / 2, 700); ctx.fillText("COMENTA ↓", W / 2, 700);
+    ctx.font = '700 28px "Inter"'; ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = 6;
+    ctx.strokeText("Ilustração exagerada. Não tente isso.", W / 2, 1830); ctx.fillText("Ilustração exagerada. Não tente isso.", W / 2, 1830);
+    ctx.restore();
+  }
+  captions(t);
+};
+window.DURATION = DURATION;
+Promise.all(['900 92px "Inter"', '800 34px "Inter"'].map(f => document.fonts.load(f))).then(() => { window.seek(0); window.READY = true; });
+</script>
+</body></html>

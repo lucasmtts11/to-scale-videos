@@ -53,6 +53,8 @@ narração "sem pausa nenhuma" das referências).
   valor-chave fica pelo menos 1,5 s na tela; legenda não sobrepõe HUD.
 - Só valores conferidos na web ou ordens de grandeza com "~".
 
+- Título e HUD sempre sobre um gradiente escuro no topo da tela; cenário claro sem isso deixa o texto ilegível (ep06).
+
 ## 7. Medição (ainda não implantado, depende do Lucas)
 - Critério para escolher formato e tema: vezes a média do próprio canal, nunca views brutas (Celtic + Virlo).
 - Fechamento semanal (findings.md): para cada vídeo, base, desempenho contra a média e uma mudança; vira regra

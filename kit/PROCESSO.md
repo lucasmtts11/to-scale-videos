@@ -102,3 +102,15 @@ checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de es
   saía "três" e passava). Instalar: `pip install --break-system-packages num2words`.
   CONFERÊNCIA obrigatória depois do TTS: transcrever cada v_<trecho>.wav e comparar com o roteiro (script analisa.py do
   exemplo-ep05); qualquer palavra faltando no fim de frase = regenerar o trecho.
+
+## Lições do ep06 (27/11, 50 litros de cerveja)
+- PRÉVIA ANTES DO TTS: `python3 kit/fake_tl.py` (na pasta do episódio, com o roteiro.json) gera um timeline.js FALSO
+  (tempo estimado por palavra). Dá para escrever a cena e olhar as prévias enquanto o pip baixa o torch, ANTES de
+  disparar o TTS (depois, Chrome e TTS juntos estouram a memória). Achou 6 problemas de enquadramento sem custo.
+  Depois do TTS, rodar o build_timeline.py de novo sobrescreve o timeline.js com os tempos reais.
+- Tempos medidos: pip completo ~9 min (a 10 MB/s); TTS com voz de referência ~2,5 min por trecho (9 trechos ≈ 23 min).
+- Cenário claro (parede bege) deixa título e HUD ilegíveis: a cena agora desenha um gradiente escuro no topo
+  (0 a 900 px, 55% → 0%) antes do HUD. Manter em todo episódio.
+- Ao trocar de cenário dentro do trecho (ex.: mesa → gangorra), ESCONDER o objeto antigo; senão os dois se sobrepõem.
+- Horário: a memória do projeto registrou "mudou de 19h para 17h" (26/11), mas o prompt da tarefa agendada foi
+  atualizado depois (27/11 01:22 UTC) e diz 19:00. Vale o prompt da tarefa mais recente.
