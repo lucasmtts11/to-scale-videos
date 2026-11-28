@@ -1,6 +1,6 @@
 # Regras tiradas dos estudos (leitura obrigatória antes de cada episódio)
 
-Fontes: os 8 estudos de vídeos de referência (documentos do projeto AUTOMACOES no claude.ai, em
+Fontes: os 9 estudos (o 9º, @nickoshuo, está também em kit/estudos/) de vídeos de referência (documentos do projeto AUTOMACOES no claude.ai, em
 `CLAUDE/canal tiktok/estudos/*/estudo.md`), a análise de quadros do vídeo da Bitmap e os artigos que o Lucas
 mandou em 25/11 (Matheus Celtic, jaffa/Virlo, eigen/seek(t)). Quando uma regra daqui conflitar com feedback
 direto do Lucas, vale o feedback do Lucas (ex.: ele pediu pausas naturais na narração, então não usamos a
@@ -19,6 +19,9 @@ narração "sem pausa nenhuma" das referências).
 - Cartão de dado com FONTE quando o número vem de órgão oficial ("ESTIMATIVA IBGE 2025", "TACO"): dá credibilidade (@animaet).
 - Fecho com pergunta direta que vira pauta: "Qual a próxima experiência? Comenta aqui embaixo." (frase do Lucas, 27/11). Quando um tema vier dos comentários,
   abrir o episódio com "Vocês pediram: ..." (@vidadabia, @animaet).
+- CTA de MÚLTIPLA ESCOLHA na tela (@nickoshuo: "hats · lead · kick – tell me below"): dar 3 opções de próximo tema
+  ("🍔 40 lanches · ☕ 5 L de café · 🌶️ 100 pimentas") facilita comentar com uma palavra; o mais votado vira episódio
+  aberto com "Vocês pediram".
 - De vez em quando, gancho de PARTE 2 no fim ("e se fossem 100?"), que faz seguir o perfil (@itsshukee). Só quando
   a parte 2 for realmente produzida no dia seguinte.
 - Humor: exagero visual e onomatopeias na tela (BUUURP!, TUUUM!, BIIII!). Narrador com personalidade (@dwxzmusic).
@@ -53,6 +56,10 @@ narração "sem pausa nenhuma" das referências).
   valor-chave fica pelo menos 1,5 s na tela; legenda não sobrepõe HUD.
 - Só valores conferidos na web ou ordens de grandeza com "~".
 
+- Rótulo com linha apontando para a parte do corpo/órgão que ACENDE só quando a narração fala dele; os outros ficam
+  apagados (@nickoshuo: LEAD→cabeça, HATS→ombros, KICK→pés). Nos episódios de comida: raio-x com ESTÔMAGO, FÍGADO, RINS, CÉREBRO.
+- Ficha fixa de série no topo ("E SE...? · EP 07 · COMIDA") + barra fina de progresso do vídeo (@nickoshuo): identidade
+  de série e sinal de "quase acabando".
 - Título e HUD sempre sobre um gradiente escuro no topo da tela; cenário claro sem isso deixa o texto ilegível (ep06).
 
 ## 7. Medição (ainda não implantado, depende do Lucas)
@@ -89,4 +96,4 @@ Conclusões:
 - [ ] Movimentos com ease-out, mola nos objetos que chegam, elementos escalonados
 - [ ] Voz de referência carregada (log do tts.py mostra "voz de referência: ...wav")
 - [ ] Valor-chave ≥ 1,5 s na tela; nada cortado ou sobreposto no contact sheet
-- [ ] Pergunta final que vira pauta + ressalva na legenda do post
+- [ ] Pergunta final que vira pauta (de preferência com 3 opções na tela) + ressalva na legenda do post
