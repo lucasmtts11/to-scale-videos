@@ -21,7 +21,8 @@ narração "sem pausa nenhuma" das referências).
   abrir o episódio com "Vocês pediram: ..." (@vidadabia, @animaet).
 - CTA de MÚLTIPLA ESCOLHA na tela (@nickoshuo: "hats · lead · kick – tell me below"): dar 3 opções de próximo tema
   ("🍔 40 lanches · ☕ 5 L de café · 🌶️ 100 pimentas") facilita comentar com uma palavra; o mais votado vira episódio
-  aberto com "Vocês pediram".
+  aberto com "Vocês pediram". A FALA continua a do Lucas ("Qual a próxima experiência? Comenta aqui embaixo."); as
+  3 opções aparecem só na tela, embaixo da pergunta.
 - De vez em quando, gancho de PARTE 2 no fim ("e se fossem 100?"), que faz seguir o perfil (@itsshukee). Só quando
   a parte 2 for realmente produzida no dia seguinte.
 - Humor: exagero visual e onomatopeias na tela (BUUURP!, TUUUM!, BIIII!). Narrador com personalidade (@dwxzmusic).
