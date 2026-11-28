@@ -63,6 +63,10 @@ narração "sem pausa nenhuma" das referências).
   de série e sinal de "quase acabando".
 - Título e HUD sempre sobre um gradiente escuro no topo da tela; cenário claro sem isso deixa o texto ilegível (ep06).
 
+- Tema que acontece ao longo do dia (derreter, encher, esvaziar): relógio fixo no canto ("08:00" → "16:00") +
+  medidor fixo (termômetro com a marca do ponto crítico "34° DERRETE") fazem o papel de contador; quem chega no meio
+  entende em que ponto da história está (ep07, adaptação do HUD fixo da @vidadabia).
+
 ## 7. Medição (ainda não implantado, depende do Lucas)
 - Critério para escolher formato e tema: vezes a média do próprio canal, nunca views brutas (Celtic + Virlo).
 - Fechamento semanal (findings.md): para cada vídeo, base, desempenho contra a média e uma mudança; vira regra

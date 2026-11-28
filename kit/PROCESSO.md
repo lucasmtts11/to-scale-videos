@@ -1,6 +1,6 @@
 # Processo de produção — @to.scale8 (formato "E se...?" em low-poly: comida exagerada, absurdo geral e engenharia de vez em quando)
 
-Referências prontas: `exemplo-ep03/` (engenharia, casa), `exemplo-ep04/` (comida: mesa, pilha de
+Referências prontas: `exemplo-ep07/` (absurdo: casa de chocolate que derrete com deformação de vértices, relógio + termômetro), `exemplo-ep03/` (engenharia, casa), `exemplo-ep04/` (comida: mesa, pilha de
 picanha instanciada, barriga que incha, raio-x do estômago, convidados, etapas 1 hora/1 dia/1 semana) e
 `exemplo-ep05/` (absurdo: multidão instanciada de ~3 mil bonecos + "tapete" texturizado para tomadas aéreas,
 segunda cena com planeta low-poly, contagem 3-2-1, pulo em câmera lenta, sismógrafo e engarrafamento no HUD).
@@ -120,3 +120,16 @@ checklist do fim dele antes de publicar. Leia o `pilar.html` inteiro antes de es
 - Ao trocar de cenário dentro do trecho (ex.: mesa → gangorra), ESCONDER o objeto antigo; senão os dois se sobrepõem.
 - Horário: a memória do projeto registrou "mudou de 19h para 17h" (26/11), mas o prompt da tarefa agendada foi
   atualizado depois (27/11 01:22 UTC) e diz 19:00. Vale o prompt da tarefa mais recente.
+
+## Lições do ep07 (28/11, casa de chocolate a 40 °C)
+- `wordTime(trecho, "a")` / `"e"` casa com QUALQUER palavra que comece com a letra ("As", "escorrega", "esquenta"):
+  ancorar sempre em palavra única do trecho ("porta", "casa", "essas"). Para palavra repetida use o índice
+  (`wordTime("porque", "é", 1)`: o primeiro "é" era "O chocolate é cheio").
+- Similaridade baixa por gênero do número não é erro: o num2words escreve "duzentos" e o roteiro diz "duzentas"
+  (0,83 no log). Conferir no analisa.py antes de regenerar.
+- "paredes" saiu "parides" (0,88): regenerar o trecho com cópia do tts.py exigindo `sim >= 0.97` resolveu na 1ª
+  tentativa (~6 min para 4 frases).
+- Derretimento/deformação: geometria com segmentos + função `deformPt()` que move os vértices na CPU a cada quadro
+  (afunda, espalha na base, entorta, desaba) e `computeVertexNormals()`; ver `exemplo-ep07/cena.html`. Leve o
+  bastante para renderizar a ~1,3 quadro/s.
+- `grade.py` (exemplo-ep07): monta a grade de prévias de uma pasta (`python3 grade.py p3 8`).
